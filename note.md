@@ -114,7 +114,8 @@ generator client {
 
 ### 模型
 
-Prisma 架构 的数据模型定义部分定义了应用程序模型（也称为Prisma 模型）。模型
+Prisma 架构 的数据模型定义部分定义了应用程序模型（也称为Prisma 模型）。
+模型：
 
 - 表示应用程序域的实体
 - 映射到数据库中的表（关系型数据库，如 PostgreSQL）或集合（MongoDB）
@@ -255,6 +256,102 @@ model Post {
 ```prisma
 location    Unsupported("POLYGON")?
 ```
+
+#### 定义属性
+属性修改字段或模型块的行为。
+以下示例包含三个字段属性（@id、@default 和 @unique）和一个块属性（@@unique）：
+```prisma
+model User {
+  id        Int     @id @default(autoincrement())
+  firstName String
+  lastName  String
+  email     String  @unique
+  isAdmin   Boolean @default(false)
+
+  @@unique([firstName, lastName])
+}
+```
+
+#####  定义 ID 字段​：
+- `@id`：定义单字段ID
+- `@@id`：定义复合ID
+- `@unique`：定义唯一标识符，没有定义 `@id`或`@@id`时，作为模型唯一标识
+
+##### `@default()`定义默认值
+
+##### 定义唯一属性
+- `@unique`：定义单字段唯一标识
+- `@@unique`：定义复合唯一标识
+
+
+##### `@@index` 定义索引
+
+
+#### 定义枚举
+枚举是通过 enum 块定义的。
+```prisma
+model User {
+  id    Int     @id @default(autoincrement())
+  email String  @unique
+  name  String?
+  role  Role    @default(USER)
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+```
+
+#### 定义复合类型​
+要定义复合类型，请使用类型块。
+```prisma
+model Product {
+  id     String  @id @default(auto()) @map("_id") @db.ObjectId
+  name   String
+  photos Photo[]
+}
+
+type Photo {
+  height Int
+  width  Int
+  url    String
+}
+```
+
+##### 使用复合类型时的注意事项​
+- 复合类型仅支持有限的属性集。支持以下属性：
+  - @default
+  - @map
+  - Native types, such as @db.ObjectId
+- 复合类型内部不支持以下属性：
+  - @unique
+  - @id
+  - @relation
+  - @ignore
+  - @updatedAt
+
+
+
+
+
+
+#### [使用函数](https://www.prisma.io/docs/orm/reference/prisma-schema-reference#attribute-functions)
+
+#### [关系](#关系)
+
+#### prisma client
+
+##### [queries(CRUD)](https://www.prisma.io/docs/orm/reference/prisma-client-reference)
+
+##### Type definitions
+Prisma Client 还生成反映模型结构的类型定义。这些是生成的 @prisma/client 节点模块的一部分。
+
+#### 限制
+记录必须具有唯一性可识别​
+- `@id` 或` @@id` 用于单字段或多字段主键约束（每个模型最多一个）
+- `@unique` 或 `@@unique` 用于单字段或多字段唯一约束
+
 
 ### 关系
 
