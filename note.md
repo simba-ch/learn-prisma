@@ -354,6 +354,21 @@ Prisma Client 还生成反映模型结构的类型定义。这些是生成的 @p
 
 
 ### 关系
+关系是 Prisma 模式中两个模型之间的连接。
+
+以下 Prisma 架构定义了 User 和 Post 模型之间的一对多关系。突出显示涉及定义关系的字段：
+```prisma
+model User {
+  id    Int    @id @default(autoincrement())
+  posts Post[]
+}
+
+model Post {
+  id       Int  @id @default(autoincrement())
+  author   User @relation(fields: [authorId], references: [id])
+  authorId Int // relation scalar field  (used in the `@relation` attribute above)
+}
+```
 
 ### 索引
 
