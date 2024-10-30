@@ -114,12 +114,12 @@ generator client {
 
 ### 模型
 
-Prisma 架构 的数据模型定义部分定义了应用程序模型（也称为Prisma 模型）。
+Prisma 架构 的数据模型定义部分定义了应用程序模型（也称为 Prisma 模型）。
 模型：
 
 - 表示应用程序域的实体
 - 映射到数据库中的表（关系型数据库，如 PostgreSQL）或集合（MongoDB）
-- 形成生成的Prisma 客户端 API 中可用查询的基础
+- 形成生成的 Prisma 客户端 API 中可用查询的基础
 - 与 TypeScript 配合使用时，Prisma 客户端为模型提供生成的类型定义，以及它们的任何变体，以使数据库访问完全类型安全。
 
 以下架构描述了一个博客平台 - 数据模型定义已突出显示
@@ -258,8 +258,10 @@ location    Unsupported("POLYGON")?
 ```
 
 #### 定义属性
+
 属性修改字段或模型块的行为。
 以下示例包含三个字段属性（@id、@default 和 @unique）和一个块属性（@@unique）：
+
 ```prisma
 model User {
   id        Int     @id @default(autoincrement())
@@ -272,23 +274,25 @@ model User {
 }
 ```
 
-#####  定义 ID 字段​：
-- `@id`：定义单字段ID
-- `@@id`：定义复合ID
+##### 定义 ID 字段 ​：
+
+- `@id`：定义单字段 ID
+- `@@id`：定义复合 ID
 - `@unique`：定义唯一标识符，没有定义 `@id`或`@@id`时，作为模型唯一标识
 
 ##### `@default()`定义默认值
 
 ##### 定义唯一属性
+
 - `@unique`：定义单字段唯一标识
 - `@@unique`：定义复合唯一标识
 
-
 ##### `@@index` 定义索引
 
-
 #### 定义枚举
+
 枚举是通过 enum 块定义的。
+
 ```prisma
 model User {
   id    Int     @id @default(autoincrement())
@@ -303,8 +307,10 @@ enum Role {
 }
 ```
 
-#### 定义复合类型​
+#### 定义复合类型 ​
+
 要定义复合类型，请使用类型块。
+
 ```prisma
 model Product {
   id     String  @id @default(auto()) @map("_id") @db.ObjectId
@@ -319,7 +325,8 @@ type Photo {
 }
 ```
 
-##### 使用复合类型时的注意事项​
+##### 使用复合类型时的注意事项 ​
+
 - 复合类型仅支持有限的属性集。支持以下属性：
   - @default
   - @map
@@ -331,11 +338,6 @@ type Photo {
   - @ignore
   - @updatedAt
 
-
-
-
-
-
 #### [使用函数](https://www.prisma.io/docs/orm/reference/prisma-schema-reference#attribute-functions)
 
 #### [关系](#关系)
@@ -345,18 +347,22 @@ type Photo {
 ##### [queries(CRUD)](https://www.prisma.io/docs/orm/reference/prisma-client-reference)
 
 ##### Type definitions
+
 Prisma Client 还生成反映模型结构的类型定义。这些是生成的 @prisma/client 节点模块的一部分。
 
 #### 限制
-记录必须具有唯一性可识别​
+
+记录必须具有唯一性可识别 ​
+
 - `@id` 或` @@id` 用于单字段或多字段主键约束（每个模型最多一个）
 - `@unique` 或 `@@unique` 用于单字段或多字段唯一约束
 
-
 ### 关系
+
 关系是 Prisma 模式中两个模型之间的连接。
 
 以下 Prisma 架构定义了 User 和 Post 模型之间的一对多关系。突出显示涉及定义关系的字段：
+
 ```prisma
 model User {
   id    Int    @id @default(autoincrement())
@@ -370,7 +376,119 @@ model Post {
 }
 ```
 
+##### 消除关系的歧义
+
+要消除关系的歧义，您需要使用 `@relation` 属性注释关系字段并提供 `name` 参数。您可以设置任何 `name`（除了空字符串 `""`），但它必须在关系的两侧相同。
+
+```prisma
+model User {
+  id           Int     @id @default(autoincrement())
+  name         String?
+  writtenPosts Post[]  @relation("WrittenPosts")
+  pinnedPost   Post?   @relation("PinnedPost")
+}
+
+model Post {
+  id         Int     @id @default(autoincrement())
+  title      String?
+  author     User    @relation("WrittenPosts", fields: [authorId], references: [id])
+  authorId   Int
+  pinnedBy   User?   @relation("PinnedPost", fields: [pinnedById], references: [id])
+  pinnedById Int?    @unique
+}
+```
+
 #### 一对一关系
+一对一（1-1）关系是指关系两侧最多可以连接一条记录的关系。
+##### 多字段 ID
+
+仅在 **关系型数据库** 中，您还可以使用 多字段 ID 来定义一对一关系。
+
+```prisma
+model User {
+  firstName String
+  lastName  String
+  profile   Profile?
+
+  @@id([firstName, lastName])
+}
+
+model Profile {
+  id            Int    @id @default(autoincrement())
+  user          User   @relation(fields: [userFirstName, userLastName], references: [firstName, lastName])
+  userFirstName String // relation scalar field (used in the `@relation` attribute above)
+  userLastName  String // relation scalar field (used in the `@relation` attribute above)
+
+  @@unique([userFirstName, userLastName])
+}
+```
+
+##### 必填和可选的 1-1 关系字段 ​
+
+在一对一关系中，没有关系标量的关系一侧（表示数据库中外键的字段）必须是可选的：
+
+```prisma
+model User {
+  id      Int      @id @default(autoincrement())
+  profile Profile? // No relation scalar - must be optional
+}
+```
+
+但是，您可以选择带有关系标量的关系的一侧是*可选*的还是*强制*的。
+
+#### 一对多关系
+一对多（1-n）关系是指关系一侧的一条记录可以连接到另一侧的零个或多个记录的关系。
+在以下示例中，User 模型和 Post 模型之间存在一对多关系：
+```prisma
+model User {
+  id    Int    @id @default(autoincrement())
+  posts Post[]
+}
+
+model Post {
+  id       Int  @id @default(autoincrement())
+  author   User @relation(fields: [authorId], references: [id])
+  authorId Int
+}
+```
+在前面的示例中，`Post` 模型的作者关系字段引用了 `User` 模型的 `id` 字段。您还可以引用不同的字段。在这种情况下，您需要使用`@unique`属性来标记该字段，以保证只有一个用户连接到每个帖子。
+在以下示例中，作者字段引用用户模型中的电子邮件字段，该字段使用 `@unique` 属性进行标记：
+```prisma
+model User {
+  id    Int    @id @default(autoincrement())
+  email String @unique // <-- add unique attribute
+  posts Post[]
+}
+
+model Post {
+  id          Int    @id @default(autoincrement())
+  authorEmail String
+  author      User   @relation(fields: [authorEmail], references: [email])
+}
+```
+
+##### 关系数据库中的多字段关系​
+仅在关系数据库中，您还可以使用多字段 ID/复合键定义此关系：
+```prisma
+model User {
+  firstName String
+  lastName  String
+  post      Post[]
+
+  @@id([firstName, lastName])
+}
+
+model Post {
+  id              Int    @id @default(autoincrement())
+  author          User   @relation(fields: [authorFirstName, authorLastName], references: [firstName, lastName])
+  authorFirstName String // relation scalar field (used in the `@relation` attribute above)
+  authorLastName  String // relation scalar field (used in the `@relation` attribute above)
+}
+```
+
+#### 多对多关系
+
+#### 自关系
 
 ### 索引
 
@@ -384,7 +502,7 @@ model Post {
 
 ### 表继承
 
-### [PostgreSQL扩展](https://prisma.org.cn/docs/orm/prisma-schema/postgresql-extensions)
+### [PostgreSQL 扩展](https://prisma.org.cn/docs/orm/prisma-schema/postgresql-extensions)
 
 # CLIENT
 
