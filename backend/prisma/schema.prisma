@@ -14,16 +14,24 @@ datasource db {
 }
 
 model User {
-  userId   String    @id @default(auto()) @map("_id") @db.ObjectId
-  username String
-  password String
-  isAdmin  Boolean
-  Article  Article[]
+  id        String    @id @default(auto()) @map("_id") @db.ObjectId
+  username  String
+  password  String
+  isAdmin   Boolean
+  Article   Article[]
+  profile   Profile   @relation(fields: [profileId], references: [id])
+  profileId String    @unique @db.ObjectId
 }
 
 model Article {
   id          String  @id @default(auto()) @map("_id") @db.ObjectId
   isPublished Boolean
-  author      User    @relation(fields: [authorId], references: [userId])
+  author      User    @relation(fields: [authorId], references: [id])
   authorId    String  @db.ObjectId
+}
+
+model Profile {
+  id   String @id @default(auto()) @map("_id") @db.ObjectId
+  sex  Int
+  user User?
 }
