@@ -10,7 +10,8 @@ model User {
 model Profile {
   id   Int   @id @default(autoincrement())
   user User?
-}`
+}
 
 ```
-**question**： 如果使用事务，能不能同时创建 `user` 和 `profile`
+**question**： 如果使用嵌套创建，能不能同时创建 `user` 和 `profile`
+**answer**：可以
