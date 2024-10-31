@@ -398,7 +398,7 @@ model Post {
 }
 ```
 
-#### 一对一关系
+#### [一对一关系](https://www.prisma.io/docs/orm/prisma-schema/data-model/relations/one-to-one-relations)
 一对一（1-1）关系是指关系两侧最多可以连接一条记录的关系。
 ##### 多字段 ID
 
@@ -436,7 +436,7 @@ model User {
 
 但是，您可以选择带有关系标量的关系的一侧是*可选*的还是*强制*的。
 
-#### 一对多关系
+#### [一对多关系](https://www.prisma.io/docs/orm/prisma-schema/data-model/relations/one-to-many-relations)
 一对多（1-n）关系是指关系一侧的一条记录可以连接到另一侧的零个或多个记录的关系。
 在以下示例中，User 模型和 Post 模型之间存在一对多关系：
 ```prisma
@@ -486,10 +486,185 @@ model Post {
 }
 ```
 
-#### 多对多关系
+#### [多对多关系](https://www.prisma.io/docs/orm/prisma-schema/data-model/relations/many-to-many-relations)
+多对多 (m-n) 关系是指关系一侧的零个或多个记录可以连接到另一侧的零个或多个记录的关系。
+
+##### connectOrCreate
+有时您可能不知道类别记录是否存在。如果类别记录存在，您希望将新的帖子记录连接到该类别。如果 `Category` 记录不存在，您需要先创建该记录，然后将其连接到新的 `Post` 记录。
+```ts
+const assignCategories = await prisma.post.create({
+  data: {
+    title: 'How to be Bob',
+    categories: {
+      create: [
+        {
+          assignedBy: 'Bob',
+          assignedAt: new Date(),
+          category: {
+            connectOrCreate: {
+              where: {
+                id: 9,
+              },
+              create: {
+                name: 'New Category',
+                id: 9,
+              },
+            },
+          },
+        },
+      ],
+    },
+  },
+})
+```
+
+##### [定义隐式 m-n 关系的规则​](https://www.prisma.io/docs/orm/prisma-schema/data-model/relations/many-to-many-relations#conventions-for-relation-tables-in-implicit-m-n-relations)
+**MongoDB 不支持关系数据库中使用的隐式 m-n-关系。**
+
+#### [自关系](https://www.prisma.io/docs/orm/prisma-schema/data-model/relations/self-relations)
+关系字段还可以引用其自己的模型，在这种情况下，该关系称为自关系。自关系可以是任何基数：`1-1`、`1-n` 和 `m-n`。
+
+##### 一对一的自我关系：
+- 关系的双方必须定义共享相同名称的 `@relation` 属性 - 在本例中为 `BlogOwnerHistory`。
+- 一个关系字段必须是完整注释的。在此示例中，后继字段定义了字段参数和引用参数。
+- 一个关系字段必须由外键支持。 `successor` 字段由 `successorId` 外键支持，该外键引用 `id` 字段中的值。 `successorId` 标量关系字段还需要 `@unique` 属性来保证一对一关系。
+
+```prisma
+model User {
+  id          Int     @id @default(autoincrement())
+  name        String?
+  successorId Int?    @unique
+  successor   User?   @relation("BlogOwnerHistory", fields: [successorId], references: [id])
+  predecessor User?   @relation("BlogOwnerHistory")
+}
+```
+
+##### 一对多的自关系​：
+```prisma
+model User {
+  id        Int     @id @default(autoincrement())
+  name      String?
+  teacherId Int?
+  teacher   User?   @relation("TeacherStudents", fields: [teacherId], references: [id])
+  students  User[]  @relation("TeacherStudents")
+}
+```
+
+##### 多对多自关系​​：
+```prisma
+model User {
+  id        Int     @id @default(autoincrement())
+  name      String?
+  teacherId Int?
+  teacher   User?   @relation("TeacherStudents", fields: [teacherId], references: [id])
+  students  User[]  @relation("TeacherStudents")
+}
+```
+
+##### 在同一模型上定义多个自关系​：
+```prisma
+model User {
+  id         Int     @id @default(autoincrement())
+  name       String?
+  teacherId  Int?
+  teacher    User?   @relation("TeacherStudents", fields: [teacherId], references: [id])
+  students   User[]  @relation("TeacherStudents")
+  followedBy User[]  @relation("UserFollows")
+  following  User[]  @relation("UserFollows")
+}
+```
+
+#### Referential actions
+引用操作决定当您的应用程序**删除**或**更新**相关记录时记录会发生什么情况。
+
+| Referential actions                                                                                        | onDelete                               | onUpdate                                                      | 其他说明                                                                                             |
+| ---------------------------------------------------------------------------------------------------------- | -------------------------------------- | ------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| Cascade                                                                                                    | 删除引用记录会触发引用记录的删除。     | 如果依赖记录的引用标量字段被更新，则更新关系标量字段。        |                                                                                                      |
+| Restrict                                                                                                   | 如果存在任何引用记录，则防止删除。     | 防止引用记录的标识符被更改。                                  |                                                                                                      |
+| [NoAction](https://www.prisma.io/docs/orm/prisma-schema/data-model/relations/referential-actions#noaction) |                                        |                                                               | NoAction 操作与 Restrict 类似，两者之间的区别取决于所使用的数据库                                    |
+| SetNull                                                                                                    | 引用对象的标量字段将被设置为 NULL。    | 当更新引用对象的标识符时，引用对象的标量字段将被设置为 NULL。 | SetNull 仅适用于可选关系。对于所需的关系，由于标量字段不能为空，因此将引发运行时错误。               |
+| SetDefault                                                                                                 | 引用对象的标量字段将设置为字段默认值。 | 引用对象的标量字段将设置为字段默认值。                        | 这些需要使用@default为关系标量字段设置默认值。如果没有为任何标量字段提供默认值，则会引发运行时错误。 |
 
 
-#### 自关系
+##### 默认的Referential actions
+| 操作     | 可选关系 | 必填关系 |
+| -------- | -------- | -------- |
+| onDelete | SetNull  | Restric  |
+| onUpdate | Cascade  | Cascade  |
+
+##### [参考行动的特殊情况​](https://www.prisma.io/docs/orm/prisma-schema/data-model/relations/referential-actions#special-cases-for-referential-actions)
+
+##### [数据库特定要求​](https://www.prisma.io/docs/orm/prisma-schema/data-model/relations/referential-actions/special-rules-for-referential-actions)
+
+```prisma
+model User {
+  id    Int    @id @default(autoincrement())
+  posts Post[]
+}
+
+model Post {
+  id     Int          @id @default(autoincrement())
+  title  String
+  tags   TagOnPosts[]
+  User   User?        @relation(fields: [userId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  userId Int?
+}
+
+model TagOnPosts {
+  id     Int   @id @default(autoincrement())
+  post   Post? @relation(fields: [postId], references: [id], onUpdate: Cascade, onDelete: Cascade)
+  tag    Tag?  @relation(fields: [tagId], references: [id], onUpdate: Cascade, onDelete: Cascade)
+  postId Int?
+  tagId  Int?
+}
+
+model Tag {
+  id    Int          @id @default(autoincrement())
+  name  String       @unique
+  posts TagOnPosts[]
+}
+```
+
+#### Relation mode关系模式
+Prisma ORM 有两种关系模式：`foreignKeys` 和 `prisma`，它们指定如何强制记录之间的关系。
+```prisma
+model Post {
+  id       Int    @id @default(autoincrement())
+  title    String
+  author   User   @relation(fields: [authorId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  authorId Int
+}
+
+model User {
+  id    Int    @id @default(autoincrement())
+  posts Post[]
+}
+```
+如果您将 Prisma ORM 与***关系数据库***一起使用，则默认情况下 Prisma ORM 使用外键关系模式，该模式使用外键在数据库级别强制记录之间的关系。
+
+##### 设置关系模式
+要设置关系模式，请在数据源块中添加关系模式字段：
+- foreignKeys：它使用外键处理数据库中的关系。这是所有关系数据库连接器的默认选项，如果数据源块中未显式设置关系模式，则该选项处于活动状态。
+- prisma：这模拟 Prisma 客户端中的关系。当您将 `MySQL` 连接器与 `PlanetScale` 数据库结合使用并且未在 `PlanetScale` 数据库设置中启用本机外键约束时，您还应该启用此选项。
+```prisma
+datasource db {
+  provider     = "mysql"
+  url          = env("DATABASE_URL")
+  relationMode = "prisma"
+}
+```
+对于 `MongoDB`，唯一可用的选项是 `prisma` 关系模式。如果数据源块中没有显式设置关系模式，则此模式也处于活动状态。
+
+`foreignKeys` 关系模式使用外键处理关系数据库中的关系。当您使用关系数据库连接器（PostgreSQL、MySQL、SQLite、SQL Server、CockroachDB）时，这是默认选项。
+使用 `MongoDB` 连接器时，`foreignKeys` 关系模式不可用。一些关系数据库，例如 `PlanetScale`，也禁止使用外键。在这些情况下，您应该使用 `prisma` 关系模式来模拟 Prisma ORM 中的关系。
+
+##### Indexes索引​
+在使用外键约束的关系数据库中，数据库通常还会隐式地为外键列创建索引。例如，`MySQL`将在所有外键列上创建索引。这是为了允许外键检查快速运行并且不需要表扫描。
+`prisma` 关系模式不使用外键，因此当您使用 `Prisma Migrate` 或 `db Push` 将更改应用到数据库时，不会创建任何索引。相反，您需要使用 `@@index` 属性（或 `@unique`、`@@unique` 或 `@@id` 属性，如果适用）在关系标量字段上手动添加索引。
+
+#### Troubleshooting relations 排查关系问题
+对模式进行建模有时会带来一些意想不到的结果。
+
 
 ### 索引
 
