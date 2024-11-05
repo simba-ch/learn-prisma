@@ -669,12 +669,198 @@ datasource db {
 **解决方案​：** 重命名隐式多对多自关系中的关系字段，请确保保持字段的字母顺序 - 例如，通过添加前缀 a_ 和 _b。
 
 
-
 ### 索引
 
-### 视图
+#### length 参数
+length 参数特定于 `MySQL`，允许您在 `String` 和 `Byte` 类型的列上定义索引和约束。
+对于这些类型，`MySQL` 要求您指定要索引的值的子部分的最大长度，以防整个值超出 `MySQL` 对索引大小的限制。
+长度参数可用于`@id`、`@@id`、`@unique`、`@@unique` 和`@@index` 属性。
+length 参数允许您指定仅 id 值的子部分代表主键。在下面的示例中，使用了前 100 个字符
+```prisma
+model Id {
+  id String @id(length: 100) @db.VarChar(3000)
+}
+```
+
+长度参数也可以用在复合主键上，使用 `@@id` 属性，如下例所示：
+```prisma
+model CompoundId {
+  id_1 String @db.VarChar(3000)
+  id_2 String @db.VarChar(3000)
+
+  @@id([id_1(length: 100), id_2(length: 10)])
+}
+```
+类似的语法可用于`@@unique` 和`@@index` 属性。
+
+
+#### sort 参数
+使用 sort 配置索引排序顺序​
+sort 参数适用于 Prisma ORM 支持的所有数据库。
+它允许您指定索引或约束条目在数据库中的存储顺序。
+这可能会影响数据库是否能够对特定查询使用索引。
+排序参数可用于`@unique``、@@unique` 和`@@index` 上的所有数据库。此外，SQL Server 还允许在`@id` 和`@@id` 上使用它。
+
+```prisma
+model Unique {
+  unique Int @unique(sort: Desc)
+}
+
+model CompoundUnique {
+  unique_1 Int
+  unique_2 Int
+
+  @@unique([unique_1(sort: Desc), unique_2])
+}
+
+```
+
+#### 同时使用 `length` 参数 和 `sort` 参数
+以下示例演示了如何使用排序和长度参数来配置 Post 模型的索引和约束：
+```prisma
+model Post {
+  title      String   @db.VarChar(300)
+  abstract   String   @db.VarChar(3000)
+  slug       String   @unique(sort: Desc, length: 42) @db.VarChar(3000)
+  author     String
+  created_at DateTime
+
+  @@id([title(length: 100, sort: Desc), abstract(length: 10)])
+  @@index([author, created_at(sort: Desc)])
+}
+
+```
+
+#### type 参数
+使用 type 配置索引的访问类型（PostgreSQL）​
+type 参数可用于使用 `@@index` 属性配置 `PostgreSQL` 中的索引类型。
+可用的索引访问方法有 `Hash`、`Gist`、`Gin`、`SpGist` 和 `Brin`，以及默认的 `BTree` 索引访问方法。
+
+##### Hash
+哈希类型将以搜索和插入速度更快的格式存储索引数据，并且使用更少的磁盘空间。但是，只有 = 和 <> 比较可以使用索引，因此其他比较运算符（例如 < 和 >）使用 Hash 会比使用默认 BTree 类型时慢得多。
+例如，下面的模型在 value 字段中添加一个 Hash 类型的索引：
+```prisma
+model Example {
+  id    Int @id
+  value Int
+
+  @@index([value], type: Hash)
+}
+```
+
+##### GIN(广义倒排索引)
+GIN 索引存储复合值，例如数组或 JsonB 数据。这对于加快查询一个对象是否是另一对象的一部分很有用。它通常用于全文搜索。
+索引字段可以定义运算符类，该类定义索引处理的运算符。
+作为示例，以下模型将 Gin 索引添加到 value 字段，并使用 JsonbPathOps 作为允许使用该索引的运算符类：
+```prisma
+model Example {
+  id    Int  @id
+  value Json
+  //    ^ field type matching the operator class
+  //                  ^ operator class      ^ index type
+
+  @@index([value(ops: JsonbPathOps)], type: Gin)
+}
+```
+
+##### GiST(广义搜索树)
+GiST 索引类型用于实现用户定义类型的索引方案。
+默认情况下，GiST 索引没有太多直接用途，但例如 B-Tree 索引类型是使用 GiST 索引构建的。
+作为示例，以下模型将 Gist 索引添加到值字段，并使用 InetOps 作为将使用该索引的运算符：
+
+##### GiST，SP-GiST (空间分区)
+SP-GiST 索引对于许多不同的非平衡数据结构来说是一个不错的选择。如果查询符合分区规则，则速度会非常快。
+与 GiST 一样，SP-GiST 作为用户定义类型的构建块非常重要，允许直接使用数据库实现自定义搜索运算符。
+
+作为示例，以下模型将 SpGist 索引添加到值字段，并使用 TextOps 作为使用该索引的运算符：
+```prisma
+model Example {
+  id    Int    @id
+  value String
+  //    ^ field type matching the operator class
+
+  @@index([value], type: SpGist)
+  //                     ^ index type
+  //       ^ using the default ops: TextOps
+}
+```
+
+##### BRIN (区块范围指数)
+如果您有大量数据在插入后不会更改（例如日期和时间值），则 BRIN 索引类型非常有用。如果您的数据非常适合索引，则它可以在最小的空间中存储大型数据集。
+例如，以下模型将 Brin 索引添加到值字段，并使用 Int4BloomOps 作为将使用该索引的运算符：
+```prisma
+model Example {
+  id    Int @id
+  value Int
+  //    ^ field type matching the operator class
+  //                  ^ operator class      ^ index type
+
+  @@index([value(ops: Int4BloomOps)], type: Brin)
+}
+```
+
+
+#### clustered 参数
+配置索引是集群索引还是非集群索引
+clustered 参数可用于在 SQL Server 中配置（非）聚集索引。
+它可用于 `@id`、`@@id`、`@unique`、`@@unique` 和 `@@index` 属性。
+例如，以下模型将 @id 配置为非集群（而不是默认的集群）：
+```prisma
+model Example {
+  id    Int @id(clustered: false)
+  value Int
+}
+```
+一张表最多可以有一个聚集索引。
+
+
+#### fullTextIndex
+要启用 fullTextIndex 预览功能，请将 fullTextIndex 功能标志添加到 schema.prisma 文件的生成器块中：
+```prisma
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["fullTextIndex"]
+}
+```
+
+以下示例演示了向 Post 模型的标题和内容字段添加 @@fulltext 索引：
+```prisma
+model Post {
+  id      Int    @id
+  title   String @db.VarChar(255)
+  content String @db.Text
+
+  @@fulltext([title, content])
+}
+```
+
+在 MongoDB 上，您可以使用 `@@fulltext` 索引属性（通过 fullTextIndex 预览功能）和排序参数，以升序或降序将字段添加到全文索引。以下示例为 Post 模型的 title 和 content 字段添加 @@fulltext 索引，并按降序对 title 字段进行排序：
+```prisma
+generator js {
+  provider        = "prisma-client-js"
+  previewFeatures = ["fullTextIndex"]
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+model Post {
+  id      String @id @map("_id") @db.ObjectId
+  title   String
+  content String
+
+  @@fulltext([title(sort: Desc), content])
+}
+```
+
+
+### [视图](https://www.prisma.io/docs/orm/prisma-schema/data-model/views)
+对视图的支持目前是一个非常早期的预览功能。
 
 ### 数据库映射
+
 
 ### 如何将 Prisma ORM 与多个数据库模式一起使用
 
