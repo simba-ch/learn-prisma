@@ -1250,14 +1250,181 @@ model User {
 ，它为 Prisma 模式添加了额外的功能层。阅读他们关于[ Prisma ORM
 中多态性的博客文章](https://zenstack.dev/blog/polymorphism)以了解更多信息。
 
-## Introspection
+## [Introspection](https://www.prisma.io/docs/orm/prisma-schema/introspection)
+
+您可以使用 Prisma CLI 内省数据库，以便在 Prisma 架构中生成数据模型。生成 Prisma 客户端需要数据模型。
+将 Prisma ORM 添加到现有项目时，内省通常用于生成数据模型的初始版本。
+但是，它也可以在应用程序中重复使用。当您不使用 Prisma Migrate 但使用纯 SQL 或其他迁移工具执行架构迁移时，最常见的情况是。在这种情况下，您还需要重新检查数据库，然后重新生成 Prisma 客户端以反映 Prisma 客户端 API 中的架构更改。
+
+### introspection 有什么用？
+
+Introspection 有一个主要功能：使用反映当前数据库架构的数据模型填充 Prisma 架构。
+![introspection示意图](./assets/prisma-introspection.png)
+
+#### 在 SQL 数据库上的主要功能：
+
+- 将数据库中的表映射到 Prisma 模型
+- 将数据库中的列映射到 Prisma 模型的字段
+- 将数据库中的索引映射到 Prisma 架构中的索引
+- 将数据库约束映射到 Prisma 架构中的属性或类型修饰符
+
+#### 在 MongoDB 数据库上的主要功能：
+
+- 将数据库中的集合映射到 Prisma 模型。由于 MongoDB 中的集合没有预定义的结构，Prisma ORM 对集合中的文档进行采样并相应地派生模型结构（即将文档的字段映射到 Prisma 模型的字段）。如果在集合中检测到嵌入类型，这些类型将映射到 Prisma 架构中的复合类型。
+- 将数据库中的索引映射到 Prisma 模式中的索引，如果集合中至少包含一个文档包含索引中包含的字段
 
 ## [PostgreSQL 扩展](https://prisma.org.cn/docs/orm/prisma-schema/postgresql-extensions)
 
 # CLIENT
+
+Prisma Client 是一个自动生成且类型安全的查询生成器，专为您的数据量身定制。
+
+## setup & configuration
+
+1. 先决条件
+   为了设置 Prisma 客户端，您需要一个带有数据库连接的 Prisma 架构文件、Prisma 客户端生成器和至少一个模型：
+
+   ```prisma
+   datasource db {
+     url      = env("DATABASE_URL")
+     provider = "postgresql"
+   }
+
+   generator client {
+     provider = "prisma-client-js"
+   }
+
+   model User {
+     id        Int      @id @default(autoincrement())
+     createdAt DateTime @default(now())
+     email     String   @unique
+     name      String?
+   }
+   ```
+
+2. 安装
+   使用以下命令在您的项目中安装 Prisma 客户端：
+
+   ```cmd
+   npm install @prisma/client
+   ```
+
+   此命令还运行 prisma generated 命令，该命令将 Prisma Client 生成到 node_modules/.prisma/client 目录中。
+
+3. 导入 Prisma 客户端
+   根据您的用例，有多种方法可以将 Prisma 客户端导入到您的项目中：
+
+   ```ts
+   import { PrismaClient } from "@prisma/client";
+
+   const prisma = new PrismaClient();
+   // use `prisma` in your application to read and write data in your DB
+   ```
+
+   对于边缘环境，您可以按如下方式导入 Prisma 客户端：
+
+   ```ts
+   import { PrismaClient } from "@prisma/client/edge";
+
+   const prisma = new PrismaClient();
+   // use `prisma` in your application to read and write data in your DB
+   ```
+
+4. 使用 Prisma 客户端向您的数据库发送查询 ​
+   实例化 PrismaClient 后，您可以开始在代码中发送查询：
+
+   ```ts
+   // run inside `async` function
+   const newUser = await prisma.user.create({
+     data: {
+       name: "Alice",
+       email: "alice@prisma.io",
+     },
+   });
+   const users = await prisma.user.findMany();
+   ```
+
+5. 改进您的应用程序 ​
+   每当您对 Prisma 架构中反映的数据库进行更改时，您都需要手动重新生成 Prisma Client 以更新 node_modules/.prisma/client 目录中生成的代码：
+
+```cmd
+prisma generate
+```
+
+### [生成 Prisma Client](https://www.prisma.io/docs/orm/prisma-client/setup-and-configuration/generating-prisma-client)
+
+Prisma Client 是一个自动生成的数据库客户端，专为您的数据库架构量身定制。默认情况下，Prisma 客户端生成到 node_modules/.prisma/client 文件夹中，但您可以指定自定义位置。
+![](./assets/prisma-client-generation.png)
+
+#### 使用自定义输出路径 ​
+
+```prisma
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/client"
+}
+```
+
+为该架构文件运行 prisma generated 后，Prisma 客户端包将位于：./src/generated/client
+
+### 实例化 Prisma Client
+
+如何从默认路径导入并实例化生成的客户端：
+
+```ts
+import { PrismaClient } from "@prisma/client";
+
+const prisma = new PrismaClient();
+```
+
+#### PrismaClient 实例的数量很重要 ​
+
+您的应用程序通常应该只创建一个 PrismaClient 实例。如何实现这一点取决于您是在长时间运行的应用程序中还是在无服务器环境中使用 Prisma ORM。
+
+原因是 PrismaClient 的每个实例都管理一个连接池，这意味着大量客户端可能会耗尽数据库连接限制。这适用于所有数据库连接器。
+
+如果您使用 MongoDB 连接器，连接由 MongoDB 驱动程序连接池管理。如果您使用关系数据库连接器，连接由 Prisma ORM 的连接池管理。 PrismaClient 的每个实例都会创建自己的池。
+
+1. 每个客户端都会创建自己的查询引擎实例。
+2. 每个查询引擎都会创建一个连接池，默认池大小为：
+  - 对于关系数据库，num_physical_cpus * 2 + 1
+  - [100 for MongoDB](https://www.mongodb.com/zh-cn/docs/manual/reference/connection-string/)
+3. 太多连接可能会开始减慢数据库速度并最终导致错误
+
+### 数据库连接
+
+### 自定义模型和字段名
+
+### 配置错误格式
+
+### 读取副本
+
+### database polyfills
+
+## queries
+
+## write your own SQL
+
+## fields & types
+
+## extensions
+
+## type safety
+
+## testing
+
+## deployment
+
+## observability & logging
+
+## debugging & troubleshooting
 
 # MIGRATE
 
 # 工具
 
 # 参考
+
+```
+
+```
