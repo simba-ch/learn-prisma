@@ -1,5 +1,7 @@
-# 强制1-1关系​
+# 强制 1-1 关系 ​
+
 在以下示例中，profile 和 profileId 是必需的。这意味着您无法在不连接或创建配置文件的情况下创建用户：
+
 ```prisma
 model User {
   id        Int     @id @default(autoincrement())
@@ -13,5 +15,7 @@ model Profile {
 }
 
 ```
+
 **question**： 如果使用嵌套创建，能不能同时创建 `user` 和 `profile`
 **answer**：可以
+
