@@ -1391,19 +1391,220 @@ const prisma = new PrismaClient();
   - [100 for MongoDB](https://www.mongodb.com/zh-cn/docs/manual/reference/connection-string/)
 3. 太多连接可能会开始减慢数据库速度并最终导致错误
 
-### 数据库连接
+### [数据库连接](https://www.prisma.io/docs/orm/prisma-client/setup-and-configuration/databases-connections)
+
 
 ### 自定义模型和字段名
+使用 `@map` 和 `@@map` 来对 prisma client和数据库中的表和列进行解耦
+
 
 ### 配置错误格式
 
-### 读取副本
+### [Formatting levels(格式化级别)](https://www.prisma.io/docs/orm/prisma-client/setup-and-configuration/error-formatting)
 
-### database polyfills
+
+### read replicas (只读副本)
+只读副本使您能够跨数据库副本分配工作负载，以应对高流量工作负载。
+只读副本扩展 `@prisma/extension-read-replicas` 向 Prisma 客户端添加了对只读数据库副本的支持。
+
+1. 安装扩展
+    ```cmd
+    npm install @prisma/extension-read-replicas
+    ```
+
+2. 通过扩展 Prisma 客户端实例来初始化扩展，并为扩展提供一个指向扩展的 url 选项中的只读副本的连接字符串。
+    ```ts
+    import { PrismaClient } from '@prisma/client'
+    import { readReplicas } from '@prisma/extension-read-replicas'
+
+    const prisma = new PrismaClient().$extends(
+      readReplicas({
+        url: process.env.DATABASE_URL_REPLICA,
+      })
+    )
+
+    // Query is run against the database replica
+    await prisma.post.findMany()
+
+    // Query is run against the primary database
+    await prisma.post.create({ 
+      data: {/** */},
+    })
+    ```
+    所有读取操作，例如`findMany` 将针对具有上述设置的数据库副本执行。所有写操作 - 例如创建、更新和 `$transaction` 查询将针对您的主数据库执行。
+
+3. 配置多个数据库副本​
+    url 属性还接受一个值数组，即您想要配置的所有数据库副本的数组：
+    ```ts
+    const prisma = new PrismaClient().$extends(
+      readReplicas({
+        url: [
+          process.env.DATABASE_URL_REPLICA_1,
+          process.env.DATABASE_URL_REPLICA_2,
+        ],
+      })
+    )
+    ```
+    如果您配置了多个只读副本，系统将随机选择一个数据库副本来执行您的查询。
+
+4. 对主数据库执行读取操作​
+    您可以使用 `$primary()` 方法对主数据库显式执行读取操作：
+    ```ts
+    const posts = await prisma.$primary().post.findMany()
+    ```
+
+5. 针对数据库副本执行操作​
+    您可以使用 `$replica()` 方法对副本而不是主数据库显式执行查询：
+    ```ts
+    const result = await prisma.$replica().user.findFirst()
+    ```
+
+### [database polyfills](https://www.prisma.io/docs/orm/prisma-client/setup-and-configuration/database-polyfills)
 
 ## queries
 
+### CRUD
+
+#### Create
+##### 创建单个记录​
+```ts
+import { PrismaClient, Prisma } from '@prisma/client'
+const prisma = new PrismaClient()
+
+const user = await prisma.user.create({
+  data: {
+    email: 'elsa@prisma.io',
+    name: 'Elsa Prisma',
+  },
+})
+// 返回结果
+// {
+//   id: 22,
+//   name: 'Elsa Prisma',
+//   email: 'elsa@prisma.io',
+//   profileViews: 0,
+//   role: 'USER',
+//   coinflips: []
+// }
+
+async function main() {
+  let includePosts: boolean = false
+  let user: Prisma.UserCreateInput
+
+  // Check if posts should be included in the query
+  // 以下示例产生相同的结果，但在 create() 查询的上下文之外创建一个名为 user 的 UserCreateInput 变量。完成简单的检查（“post是否应该包含在此 create() 查询中？”）后，用户变量将传递到查询中：
+  if (includePosts) {
+    user = {
+      email: 'elsa@prisma.io',
+      name: 'Elsa Prisma',
+      posts: {
+        create: {
+          title: 'Include this post!',
+        },
+      },
+    }
+  } else {
+    user = {
+      email: 'elsa@prisma.io',
+      name: 'Elsa Prisma',
+    }
+  }
+
+  // Pass 'user' object into query
+  const createUser = await prisma.user.create({ data: user })
+}
+main()
+```
+
+##### 创建多条记录​
+```ts
+const createMany = await prisma.user.createMany({
+  data: [
+    { name: 'Bob', email: 'bob@prisma.io' },
+    { name: 'Bobo', email: 'bob@prisma.io' }, // Duplicate unique key!
+    { name: 'Yewande', email: 'yewande@prisma.io' },
+    { name: 'Angelique', email: 'angelique@prisma.io' },
+  ],
+  skipDuplicates: true, // Skip 'Bobo'
+})
+// 返回结果
+// {
+//   count: 3
+// }
+```
+
+##### 创建并返回多条记录​
+```ts
+const users = await prisma.user.createManyAndReturn({
+  data: [
+    { name: 'Alice', email: 'alice@prisma.io' },
+    { name: 'Bob', email: 'bob@prisma.io' },
+  ],
+})
+
+// 返回结果
+// [{
+//   id: 22,
+//   name: 'Alice',
+//   email: 'alice@prisma.io',
+//   profileViews: 0,
+//   role: 'USER',
+//   coinflips: []
+// }, {
+//   id: 23,
+//   name: 'Bob',
+//   email: 'bob@prisma.io',
+//   profileViews: 0,
+//   role: 'USER',
+//   coinflips: []
+// }]
+```
+
+#### Read
+
+#### Update
+
+#### Delete
+
+#### Advanced query examples
+
+
+
+### Select fields
+
+### Relation queries
+
+### Filtering and Sorting
+
+### Pagination
+
+### Aggregation,grouping,and summarizing
+
+### Transactions and batch queries
+
+### Full-text search
+
+### Custom validation
+
+### Computed fields
+
+### Excluding fields
+
+
+### Custom models
+
+
+### Case sensitivity
+
+### Query optimization
+
 ## write your own SQL
+
+### TypedSQL
+
+### Raw queries
+
+### SafeQL & Prisma Client
 
 ## fields & types
 
