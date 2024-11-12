@@ -1387,77 +1387,86 @@ const prisma = new PrismaClient();
 
 1. 每个客户端都会创建自己的查询引擎实例。
 2. 每个查询引擎都会创建一个连接池，默认池大小为：
-  - 对于关系数据库，num_physical_cpus * 2 + 1
-  - [100 for MongoDB](https://www.mongodb.com/zh-cn/docs/manual/reference/connection-string/)
+
+- 对于关系数据库，num_physical_cpus \* 2 + 1
+- [100 for MongoDB](https://www.mongodb.com/zh-cn/docs/manual/reference/connection-string/)
+
 3. 太多连接可能会开始减慢数据库速度并最终导致错误
 
 ### [数据库连接](https://www.prisma.io/docs/orm/prisma-client/setup-and-configuration/databases-connections)
 
-
 ### 自定义模型和字段名
-使用 `@map` 和 `@@map` 来对 prisma client和数据库中的表和列进行解耦
 
+使用 `@map` 和 `@@map` 来对 prisma client 和数据库中的表和列进行解耦
 
 ### 配置错误格式
 
 ### [Formatting levels(格式化级别)](https://www.prisma.io/docs/orm/prisma-client/setup-and-configuration/error-formatting)
 
-
 ### read replicas (只读副本)
+
 只读副本使您能够跨数据库副本分配工作负载，以应对高流量工作负载。
 只读副本扩展 `@prisma/extension-read-replicas` 向 Prisma 客户端添加了对只读数据库副本的支持。
 
 1. 安装扩展
-    ```cmd
-    npm install @prisma/extension-read-replicas
-    ```
+
+   ```cmd
+   npm install @prisma/extension-read-replicas
+   ```
 
 2. 通过扩展 Prisma 客户端实例来初始化扩展，并为扩展提供一个指向扩展的 url 选项中的只读副本的连接字符串。
-    ```ts
-    import { PrismaClient } from '@prisma/client'
-    import { readReplicas } from '@prisma/extension-read-replicas'
 
-    const prisma = new PrismaClient().$extends(
-      readReplicas({
-        url: process.env.DATABASE_URL_REPLICA,
-      })
-    )
+   ```ts
+   import { PrismaClient } from "@prisma/client";
+   import { readReplicas } from "@prisma/extension-read-replicas";
 
-    // Query is run against the database replica
-    await prisma.post.findMany()
+   const prisma = new PrismaClient().$extends(
+     readReplicas({
+       url: process.env.DATABASE_URL_REPLICA,
+     })
+   );
 
-    // Query is run against the primary database
-    await prisma.post.create({ 
-      data: {/** */},
-    })
-    ```
-    所有读取操作，例如`findMany` 将针对具有上述设置的数据库副本执行。所有写操作 - 例如创建、更新和 `$transaction` 查询将针对您的主数据库执行。
+   // Query is run against the database replica
+   await prisma.post.findMany();
 
-3. 配置多个数据库副本​
-    url 属性还接受一个值数组，即您想要配置的所有数据库副本的数组：
-    ```ts
-    const prisma = new PrismaClient().$extends(
-      readReplicas({
-        url: [
-          process.env.DATABASE_URL_REPLICA_1,
-          process.env.DATABASE_URL_REPLICA_2,
-        ],
-      })
-    )
-    ```
-    如果您配置了多个只读副本，系统将随机选择一个数据库副本来执行您的查询。
+   // Query is run against the primary database
+   await prisma.post.create({
+     data: {
+       /** */
+     },
+   });
+   ```
 
-4. 对主数据库执行读取操作​
-    您可以使用 `$primary()` 方法对主数据库显式执行读取操作：
-    ```ts
-    const posts = await prisma.$primary().post.findMany()
-    ```
+   所有读取操作，例如`findMany` 将针对具有上述设置的数据库副本执行。所有写操作 - 例如创建、更新和 `$transaction` 查询将针对您的主数据库执行。
 
-5. 针对数据库副本执行操作​
-    您可以使用 `$replica()` 方法对副本而不是主数据库显式执行查询：
-    ```ts
-    const result = await prisma.$replica().user.findFirst()
-    ```
+3. 配置多个数据库副本 ​
+   url 属性还接受一个值数组，即您想要配置的所有数据库副本的数组：
+
+   ```ts
+   const prisma = new PrismaClient().$extends(
+     readReplicas({
+       url: [
+         process.env.DATABASE_URL_REPLICA_1,
+         process.env.DATABASE_URL_REPLICA_2,
+       ],
+     })
+   );
+   ```
+
+   如果您配置了多个只读副本，系统将随机选择一个数据库副本来执行您的查询。
+
+4. 对主数据库执行读取操作 ​
+   您可以使用 `$primary()` 方法对主数据库显式执行读取操作：
+
+   ```ts
+   const posts = await prisma.$primary().post.findMany();
+   ```
+
+5. 针对数据库副本执行操作 ​
+   您可以使用 `$replica()` 方法对副本而不是主数据库显式执行查询：
+   ```ts
+   const result = await prisma.$replica().user.findFirst();
+   ```
 
 ### [database polyfills](https://www.prisma.io/docs/orm/prisma-client/setup-and-configuration/database-polyfills)
 
@@ -1466,17 +1475,19 @@ const prisma = new PrismaClient();
 ### CRUD
 
 #### Create
-##### 创建单个记录​
+
+##### 创建单个记录 ​
+
 ```ts
-import { PrismaClient, Prisma } from '@prisma/client'
-const prisma = new PrismaClient()
+import { PrismaClient, Prisma } from "@prisma/client";
+const prisma = new PrismaClient();
 
 const user = await prisma.user.create({
   data: {
-    email: 'elsa@prisma.io',
-    name: 'Elsa Prisma',
+    email: "elsa@prisma.io",
+    name: "Elsa Prisma",
   },
-})
+});
 // 返回结果
 // {
 //   id: 22,
@@ -1488,59 +1499,63 @@ const user = await prisma.user.create({
 // }
 
 async function main() {
-  let includePosts: boolean = false
-  let user: Prisma.UserCreateInput
+  let includePosts: boolean = false;
+  let user: Prisma.UserCreateInput;
 
   // Check if posts should be included in the query
   // 以下示例产生相同的结果，但在 create() 查询的上下文之外创建一个名为 user 的 UserCreateInput 变量。完成简单的检查（“post是否应该包含在此 create() 查询中？”）后，用户变量将传递到查询中：
   if (includePosts) {
     user = {
-      email: 'elsa@prisma.io',
-      name: 'Elsa Prisma',
+      email: "elsa@prisma.io",
+      name: "Elsa Prisma",
       posts: {
         create: {
-          title: 'Include this post!',
+          title: "Include this post!",
         },
       },
-    }
+    };
   } else {
     user = {
-      email: 'elsa@prisma.io',
-      name: 'Elsa Prisma',
-    }
+      email: "elsa@prisma.io",
+      name: "Elsa Prisma",
+    };
   }
 
   // Pass 'user' object into query
-  const createUser = await prisma.user.create({ data: user })
+  const createUser = await prisma.user.create({ data: user });
 }
-main()
+main();
 ```
 
-##### 创建多条记录​
+##### 创建多条记录 ​
+
 ```ts
 const createMany = await prisma.user.createMany({
   data: [
-    { name: 'Bob', email: 'bob@prisma.io' },
-    { name: 'Bobo', email: 'bob@prisma.io' }, // Duplicate unique key!
-    { name: 'Yewande', email: 'yewande@prisma.io' },
-    { name: 'Angelique', email: 'angelique@prisma.io' },
+    { name: "Bob", email: "bob@prisma.io" },
+    { name: "Bobo", email: "bob@prisma.io" }, // Duplicate unique key!
+    { name: "Yewande", email: "yewande@prisma.io" },
+    { name: "Angelique", email: "angelique@prisma.io" },
   ],
   skipDuplicates: true, // Skip 'Bobo'
-})
+});
 // 返回结果
 // {
 //   count: 3
 // }
 ```
 
-##### 创建并返回多条记录​
+##### [创建记录并连接或创建相关记录 ​](#relation-queries) ​
+
+##### 创建并返回多条记录 ​
+
 ```ts
 const users = await prisma.user.createManyAndReturn({
   data: [
-    { name: 'Alice', email: 'alice@prisma.io' },
-    { name: 'Bob', email: 'bob@prisma.io' },
+    { name: "Alice", email: "alice@prisma.io" },
+    { name: "Bob", email: "bob@prisma.io" },
   ],
-})
+});
 
 // 返回结果
 // [{
@@ -1562,17 +1577,193 @@ const users = await prisma.user.createManyAndReturn({
 
 #### Read
 
+##### 通过 ID 或唯一标识符获取记录 ​
+
+```ts
+// By unique identifier
+const user = await prisma.user.findUnique({
+  where: {
+    email: "elsa@prisma.io",
+  },
+});
+
+// By ID
+const user = await prisma.user.findUnique({
+  where: {
+    id: 99,
+  },
+});
+```
+
+##### 获取所有记录 ​
+
+```ts
+const users = await prisma.user.findMany();
+```
+
+您还可以对结果进行[分页](#pagination)。
+
+##### 获取符合特定条件的第一条记录 ​
+
+1. 按 ID 降序排列用户（最大的在前）- 最大的 ID 是最新的
+2. 按降序返回第一个至少有一个帖子获得超过 100 个赞的用户
+
+```ts
+const findUser = await prisma.user.findFirst({
+  where: {
+    posts: {
+      some: {
+        likes: {
+          gt: 100,
+        },
+      },
+    },
+  },
+  orderBy: {
+    id: "desc",
+  },
+});
+```
+
+##### 获取过滤后的记录列表 ​
+
+Prisma Client 支持对记录字段和相关记录字段进行过滤。
+
+###### 按单个字段值过滤 ​
+
+以下查询返回电子邮件以“prisma.io”结尾的所有用户记录：
+
+```ts
+const users = await prisma.user.findMany({
+  where: {
+    email: {
+      endsWith: "prisma.io",
+    },
+  },
+});
+```
+
+###### 按多个字段值过滤 ​
+
+​ 以下查询使用[运算符](#filter-conditions-and-operators)组合返回名称以 E 开头的用户或至少具有 1 个配置文件视图的管理员：
+
+```ts
+const users = await prisma.user.findMany({
+  where: {
+    OR: [
+      {
+        name: {
+          startsWith: "E",
+        },
+      },
+      {
+        AND: {
+          profileViews: {
+            gt: 0,
+          },
+          role: {
+            equals: "ADMIN",
+          },
+        },
+      },
+    ],
+  },
+});
+```
+
+###### [按相关记录字段值过滤](#relation-queries) ​
+
+以下查询返回电子邮件以 prisma.io 结尾且至少有一篇（某些）帖子未发布的用户：
+
+```ts
+const users = await prisma.user.findMany({
+  where: {
+    email: {
+      endsWith: "prisma.io",
+    },
+    posts: {
+      some: {
+        published: false,
+      },
+    },
+  },
+});
+```
+
+##### [选择字段的子集](#select-fields) ​
+
+以下 findUnique() 查询使用 select 返回特定用户记录的电子邮件和姓名字段：
+
+```ts
+const user = await prisma.user.findUnique({
+  where: {
+    email: "emma@prisma.io",
+  },
+  select: {
+    email: true,
+    name: true,
+  },
+});
+```
+
+##### 选择相关记录字段的子集 ​
+
+​ 以下查询使用嵌套选择来返回：
+
+- 用户的电子邮件
+- 每个帖子的点赞字段
+
+```ts
+const user = await prisma.user.findUnique({
+  where: {
+    email: "emma@prisma.io",
+  },
+  select: {
+    email: true,
+    posts: {
+      select: {
+        likes: true,
+      },
+    },
+  },
+});
+
+// 返回结果
+// { email: 'emma@prisma.io', posts: [ { likes: 0 }, { likes: 0 } ] }
+```
+
+##### [选择相关记录字段的子集](#aggregationgroupingand-summarizing) ​
+
+##### [选择不同的字段值](#aggregationgroupingand-summarizing)​
+
+##### [包括相关记录](#select-fields)
+
+以下查询返回所有 ADMIN 用户并在结果中包含每个用户的帖子
+
+```ts
+const users = await prisma.user.findMany({
+  where: {
+    role: "ADMIN",
+  },
+  include: {
+    posts: true,
+  },
+});
+```
+
+##### [包括经过过滤的关系列表 ​](#filter-a-list-of-relations) ​ ​
+
 #### Update
 
 #### Delete
 
 #### Advanced query examples
 
-
-
 ### Select fields
 
 ### Relation queries
+
+#### filter a list of relations
 
 ### Filtering and Sorting
 
@@ -1590,9 +1781,7 @@ const users = await prisma.user.createManyAndReturn({
 
 ### Excluding fields
 
-
 ### Custom models
-
 
 ### Case sensitivity
 
@@ -1626,6 +1815,30 @@ const users = await prisma.user.createManyAndReturn({
 
 # 参考
 
-```
+## Prisma Client API
 
-```
+### PrismaClient
+
+### Model queries
+
+### Model query options
+
+### Nested queries
+
+### Filter conditions and operators
+
+### Relation filters
+
+### Scalar list methods
+
+### Scalar list filters
+
+### Composite type methods
+
+### Composite type filters
+
+### Atomic number operations
+
+### Json filters
+
+### Client methods
