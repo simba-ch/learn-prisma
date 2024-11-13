@@ -1755,9 +1755,204 @@ const users = await prisma.user.findMany({
 
 #### Update
 
+##### 更新单条记录 ​
+
+以下查询使用 update() 通过电子邮件查找并更新单个用户记录：
+
+```ts
+const updateUser = await prisma.user.update({
+  where: {
+    email: "viola@prisma.io",
+  },
+  data: {
+    name: "Viola the Magnificent",
+  },
+});
+
+// {
+//    "id": 43,
+//    "name": "Viola the Magnificent",
+//    "email": "viola@prisma.io",
+//    "profileViews": 0,
+//    "role": "USER",
+//    "coinflips": [],
+// }
+```
+
+##### 更新多条记录
+
+以下查询使用 updateMany() 更新包含 prisma.io 的所有用户记录：
+
+```ts
+const updateUsers = await prisma.user.updateMany({
+  where: {
+    email: {
+      contains: "prisma.io",
+    },
+  },
+  data: {
+    role: "ADMIN",
+  },
+});
+// {
+//    "count": 19
+// }
+```
+
+##### 更新或创建记录 ​
+
+以下查询使用 upsert() 更新具有特定电子邮件地址的用户记录，或者创建该用户记录（如果不存在）：
+
+```ts
+const upsertUser = await prisma.user.upsert({
+  where: {
+    email: "viola@prisma.io",
+  },
+  update: {
+    name: "Viola the Magnificent",
+  },
+  create: {
+    email: "viola@prisma.io",
+    name: "Viola the Magnificent",
+  },
+});
+
+// {
+//    "id": 43,
+//    "name": "Viola the Magnificent",
+//    "email": "viola@prisma.io",
+//    "profileViews": 0,
+//    "role": "ADMIN",
+//    "coinflips": [],
+// }
+```
+
+##### 查找或创建记录 ​
+
+Prisma 客户端没有 findOrCreate() 查询。您可以使用 upsert() 作为解决方法。要使 upsert() 的行为类似于 findOrCreate() 方法，请向 upsert() 提供一个空更新参数。
+
+##### 更新数字字段 ​
+
+使用原子数运算根据当前值更新数字字段 - 例如递增或乘法。以下查询将视图和喜欢字段加 1：
+
+```ts
+const updatePosts = await prisma.post.updateMany({
+  data: {
+    views: {
+      increment: 1,
+    },
+    likes: {
+      increment: 1,
+    },
+  },
+});
+```
+
+##### [连接和断开相关记录 ​](#relation-queries)
+
 #### Delete
 
+##### 删除单条记录 ​
+
+以下查询使用 delete()删除单个用户记录：
+
+```ts
+const deleteUser = await prisma.user.delete({
+  where: {
+    email: "bert@prisma.io",
+  },
+});
+```
+
+尝试删除具有一个或多个帖子的用户会导致错误，因为每个帖子都需要一个作者 - [请参阅级联删除](#referential-actions)。
+
+##### 删除多条记录 ​
+
+以下查询使用 deleteMany()删除电子邮件包含 prisma.io 的所有用户记录：
+
+```ts
+const deleteUsers = await prisma.user.deleteMany({
+  where: {
+    email: {
+      contains: "prisma.io",
+    },
+  },
+});
+```
+
+##### 删除多条记录 ​
+以下查询使用deleteMany()删除所有用户记录：
+```ts
+const deleteUsers = await prisma.user.deleteMany({})
+```
+
+##### [级联删除（删除相关记录）](https://www.prisma.io/docs/orm/prisma-client/queries/crud#cascading-deletes-deleting-related-records)
+
+##### [删除所有表中的所有记录​](https://www.prisma.io/docs/orm/prisma-client/queries/crud#delete-all-records-from-all-tables)
+
+
 #### Advanced query examples
+
+##### 创建深度嵌套的记录树​ ​
+1. 单个用户
+2. 两个新的相关帖子记录
+3. 连接或创建每个帖子的类别
+```ts
+const u = await prisma.user.create({
+  include: {
+    posts: {
+      include: {
+        categories: true,
+      },
+    },
+  },
+  data: {
+    email: 'emma@prisma.io',
+    posts: {
+      create: [
+        {
+          title: 'My first post',
+          categories: {
+            connectOrCreate: [
+              {
+                create: { name: 'Introductions' },
+                where: {
+                  name: 'Introductions',
+                },
+              },
+              {
+                create: { name: 'Social' },
+                where: {
+                  name: 'Social',
+                },
+              },
+            ],
+          },
+        },
+        {
+          title: 'How to make cookies',
+          categories: {
+            connectOrCreate: [
+              {
+                create: { name: 'Social' },
+                where: {
+                  name: 'Social',
+                },
+              },
+              {
+                create: { name: 'Cooking' },
+                where: {
+                  name: 'Cooking',
+                },
+              },
+            ],
+          },
+        },
+      ],
+    },
+  },
+})
+```
 
 ### Select fields
 
