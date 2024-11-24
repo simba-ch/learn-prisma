@@ -3128,6 +3128,180 @@ const users = await prisma.user.findMany({
 
 
 ### Pagination
+Prisma Client 支持偏移分页和基于光标的分页。
+
+#### 偏移分页
+偏移分页使用 `skip` 和 `take` 来跳过一定数量的结果并选择有限的范围。
+以下查询跳过前 3 个 Post 记录并返回记录 4 - 7：
+```ts
+const results = await prisma.post.findMany({
+  skip: 3,
+  take: 4,
+})
+```
+
+##### 偏移分页的优点​
+- 您可以立即跳转到任何页面。
+- 您可以按任何排序顺序对同一结果集进行分页。
+
+##### 偏移分页的缺点​
+- 偏移分页不会在数据库级别扩展。
+
+##### 偏移分页的用例​
+- 小结果集的浅分页。
+
+##### 示例：过滤和偏移分页​
+以下查询返回电子邮件字段包含 prisma.io 的所有记录。该查询跳过前 40 条记录并返回记录 41 - 50。
+```ts
+const results = await prisma.post.findMany({
+  skip: 40,
+  take: 10,
+  where: {
+    email: {
+      contains: 'prisma.io',
+    },
+  },
+})
+```
+
+##### 示例：排序和偏移分页​
+以下查询返回电子邮件字段包含 Prisma 的所有记录，并按标题字段对结果进行排序。该查询跳过前 200 条记录并返回记录 201 - 220。
+```ts
+const results = await prisma.post.findMany({
+  skip: 200,
+  take: 20,
+  where: {
+    email: {
+      contains: 'Prisma',
+    },
+  },
+  orderBy: {
+    title: 'desc',
+  },
+})
+```
+
+
+#### 基于游标的分页
+基于游标的分页使用游标和 `take` 在给定游标之前或之后返回一组有限的结果。游标为您在结果集中的位置添加书签，并且必须是唯一的连续列 - 例如 ID 或时间戳。
+
+以下示例返回前 4 条包含单词“Prisma”的 Post 记录，并将最后一条记录的 ID 保存为 myCursor：
+***注意***：由于这是第一个查询，因此没有要传入的游标。
+```ts
+const firstQueryResults = await prisma.post.findMany({
+  take: 4,
+  where: {
+    title: {
+      contains: 'Prisma' /* Optional filter */,
+    },
+  },
+  orderBy: {
+    id: 'asc',
+  },
+})
+
+// Bookmark your location in the result set - in this
+// case, the ID of the last post in the list of 4.
+
+const lastPostInResults = firstQueryResults[3] // Remember: zero-based index! :)
+const myCursor = lastPostInResults.id // Example: 29
+```
+
+第二个查询返回在提供的光标之后包含单词“Prisma”的前 4 个 Post 记录（换句话说 - 大于 29 的 ID）：
+```ts
+const secondQueryResults = await prisma.post.findMany({
+  take: 4,
+  skip: 1, // Skip the cursor
+  cursor: {
+    id: myCursor,
+  },
+  where: {
+    title: {
+      contains: 'Prisma' /* Optional filter */,
+    },
+  },
+  orderBy: {
+    id: 'asc',
+  },
+})
+
+const lastPostInResults = secondQueryResults[3] // Remember: zero-based index! :)
+const myCursor = lastPostInResults.id // Example: 52
+```
+![](./assets/cursor-2.png)
+
+##### 常见问题
+
+###### 我是否总是必须 skip：1？​
+如果您不跳过：1，您的结果集将包括您之前的光标。第一个查询返回 4 个结果，游标为 29,
+如果没有skip:1，第二个查询将在光标之后（包括）返回4个结果,
+如果跳过：1，则不包括光标,
+您可以选择跳过：1 或不跳过，具体取决于您想要的分页行为。
+
+###### 我能猜出光标的值吗？​
+如果您猜测下一个光标的值，您将分页到结果集中的未知位置。尽管 ID 是连续的，但您无法预测增量速率（2、20、32 比 1、2、3 更有可能，特别是在筛选的结果集中）。
+
+###### 基于游标的分页是否使用底层数据库中游标的概念？​
+不，游标分页不使用底层数据库中的游标（例如 PostgreSQL）。
+
+###### 如果光标值不存在会发生什么？​
+使用不存在的游标将返回 null。 Prisma 客户端不会尝试查找相邻值。
+
+##### 基于游标的分页的优点
+基于光标的分页比例。底层SQL不使用OFFSET，而是查询所有ID大于cursor值的Post记录。
+
+##### 基于游标的分页的缺点
+您必须按光标排序，光标必须是唯一的连续列。
+仅使用光标无法跳转到特定页面。例如，如果不首先请求页面 1 - 399，则无法准确预测哪个光标表示第 400 页（页面大小 20）的开头。
+
+##### 基于游标的分页的用例
+- 无限滚动 - 例如，按日期/时间降序对博客文章进行排序，并一次请求 10 篇博客文章。
+- 批量分页整个结果集 - 例如，作为长期运行的数据导出的一部分。
+
+##### 示例：过滤和基于游标的分页
+```ts
+const secondQuery = await prisma.post.findMany({
+  take: 4,
+  cursor: {
+    id: myCursor,
+  },
+  where: {
+    title: {
+      contains: 'Prisma' /* Optional filter */,
+    },
+  },
+  orderBy: {
+    id: 'asc',
+  },
+})
+```
+
+##### 排序和基于游标的分页
+基于游标的分页要求您按顺序、唯一的列（例如 ID 或时间戳）进行排序。该值（称为游标）为您在结果集中的位置添加书签，并允许您请求下一组。
+
+
+##### 示例：使用基于游标的分页向后分页
+要向后翻页，请将 take 设置为负值。以下查询返回 4 条 id 小于 200 的 Post 记录（不包括游标）：
+```ts
+const myOldCursor = 200
+
+const firstQueryResults = await prisma.post.findMany({
+  take: -4,
+  skip: 1,
+  cursor: {
+    id: myOldCursor,
+  },
+  where: {
+    title: {
+      contains: 'Prisma' /* Optional filter */,
+    },
+  },
+  orderBy: {
+    id: 'asc',
+  },
+})
+```
+
 
 ### Aggregation,grouping,and summarizing
 
