@@ -1955,10 +1955,926 @@ const u = await prisma.user.create({
 ```
 
 ### Select fields
+默认情况下，当查询返回记录（而不是计数）时，结果包括：
+- 模型的所有标量字段（包括枚举）
+- 模型上没有定义关系
+```prisma
+model User {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  name      String?
+  role      Role     @default(USER)
+  posts     Post[]
+}
+
+model Post {
+  id        Int      @id @default(autoincrement())
+  published Boolean  @default(false)
+  title     String  
+  author    User?    @relation(fields: [authorId], references: [id])
+  authorId  Int?
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+```
+
+对 User 模型的查询将包括 id、email、name 和 role 字段（因为这些是标量字段），但不包括 posts 字段（因为这是一个关系字段）：
+```ts
+const users = await prisma.user.findFirst()
+// {
+//   id: 42,
+//   name: "Sabelle",
+//   email: "sabelle@prisma.io",
+//   role: "ADMIN"
+// }
+```
+
+如果您想自定义结果并返回不同的字段组合，您可以：
+- 使用 `select` 返回特定字段。您还可以通过选择关系字段来使用嵌套选择。
+- 使用 `omit` 从结果中排除特定字段。 `omit` 可以看作是 `select` 的“相反”。
+- 使用 `include` 来额外包含关系。
+
+在所有情况下，查询结果都将是静态类型的，确保您不会意外访问未从数据库中实际查询的任何字段。
+仅选择所需的字段和关系，而不是依赖默认选择集，可以减少响应的大小并提高查询速度。
+
+
+#### 选择特定字段
+使用 `select` 返回字段的子集而不是所有字段。以下示例仅返回电子邮件和姓名字段：
+```ts
+const user = await prisma.user.findFirst({
+  select: {
+    email: true,
+    name: true,
+  },
+})
+
+// {
+//   name: "Alice",
+//   email: "alice@prisma.io",
+// }
+```
+
+#### 通过选择关系字段返回嵌套对象​
+```ts
+const usersWithPostTitles = await prisma.user.findFirst({
+  select: {
+    name: true,
+    posts: {
+      select: { title: true },
+    },
+  },
+})
+
+// {
+//   "name":"Sabelle",
+//   "posts":[
+//     { "title":"Getting started with Azure Functions" },
+//     { "title":"All about databases" }
+//   ]
+// }
+```
+
+
+#### 省略特定字段​
+在某些情况下，您可能想要返回模型的大部分字段，仅排除一小部分字段。
+在这些情况下，您可以使用omit，它可以看作是select的对应项：
+```ts
+const users = await prisma.user.findFirst({
+  omit: {
+    password: true
+  }
+})
+
+
+// {
+//   id: 9
+//   name: "Sabelle",
+//   email: "sabelle@prisma.io",
+//   password: "mySecretPassword4",
+//   profileViews: 90,
+//   role: "USER",
+//   coinflips: [],
+// }
+```
+
 
 ### Relation queries
+Prisma Client 的一个关键功能是能够查询两个或多个模型之间的关系。关系查询包括：
+- 通过 `select` 和 `include` 进行嵌套读取
+- 具有事务保证的嵌套写入
+- 过滤相关记录
+
+#### 嵌套读取​
+嵌套读取允许您从数据库中的多个表中读取相关数据。
+
+##### Relation load strategies
+由于“relationLoadStrategy”选项当前处于预览状态，因此您需要通过 Prisma 架构文件中的“relationJoins”预览功能标志来启用它：
+```prisma
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["relationJoins"]
+}
+```
+添加此标志后，您需要再次运行 prismagenerate 以重新生成 Prisma Client。此功能目前在 PostgreSQL、CockroachDB 和 MySQL 上可用。
+
+Prisma 客户端支持两种关系加载策略：
+- `join`（默认）：使用数据库级 LATERAL JOIN (PostgreSQL) 或相关子查询 (MySQL)，并通过对数据库的单个查询获取所有数据。
+- `query`：将多个查询发送到数据库（每个表一个）并在应用程序级别连接它们。
+
+这两个选项之间的另一个重要区别是`join`策略在数据库级别使用 JSON 聚合。这意味着它创建的 Prisma 客户端返回的 JSON 结构已经存在于数据库中，从而节省了应用程序级别的计算资源。
+
+您可以在任何支持包含或选择的查询中使用顶层的`relationLoadStrategy` 选项。
+```ts
+const users = await prisma.user.findMany({
+  relationLoadStrategy: 'join', // or 'query'
+  include: {
+    posts: true,
+  },
+})
+
+const users = await prisma.user.findMany({
+  relationLoadStrategy: 'join', // or 'query'
+  select: {
+    posts: true,
+  },
+})
+```
+
+###### 何时使用哪种加载策略？​
+- 在大多数情况下，`join`策略（默认）会更有效。在 PostgreSQL 上，它结合使用 LATERAL JOIN 和 JSON 聚合来减少结果集中的冗余，并委托将查询结果转换为数据库服务器上预期的 JSON 结构的工作。在 MySQL 上，它使用相关子查询来通过单个查询获取结果。
+- 可能存在边缘情况，根据数据集和查询的特征，`query`可以提高性能。我们建议您分析数据库查询以识别这些情况。
+- 如果您希望节省数据库服务器上的资源并在应用程序服务器中执行繁重的数据合并和转换工作（这可能更容易扩展），请使用`query`。
+
+##### Include
+```ts
+const user = await prisma.user.findFirst({
+  include: {
+    posts: true,
+  },
+})
+
+
+// {
+//   id: 19,
+//   name: null,
+//   email: 'emma@prisma.io',
+//   profileViews: 0,
+//   role: 'USER',
+//   coinflips: [],
+//   posts: [
+//     {
+//       id: 20,
+//       title: 'My first post',
+//       published: true,
+//       authorId: 19,
+//       comments: null,
+//       views: 0,
+//       likes: 0
+//     },
+//     {
+//       id: 21,
+//       title: 'How to make cookies',
+//       published: true,
+//       authorId: 19,
+//       comments: null,
+//       views: 0,
+//       likes: 0
+//     }
+//   ]
+// }
+```
+
+###### 嵌套 Include
+```ts
+const user = await prisma.user.findFirst({
+  include: {
+    posts: {
+      include: {
+        categories: true,
+      },
+    },
+  },
+})
+
+// {
+//     "id": 40,
+//     "name": "Yvette",
+//     "email": "yvette@prisma.io",
+//     "profileViews": 0,
+//     "role": "USER",
+//     "coinflips": [],
+//     "testing": [],
+//     "city": null,
+//     "country": "Sweden",
+//     "posts": [
+//         {
+//             "id": 66,
+//             "title": "How to make an omelette",
+//             "published": true,
+//             "authorId": 40,
+//             "comments": null,
+//             "views": 0,
+//             "likes": 0,
+//             "categories": [
+//                 {
+//                     "id": 3,
+//                     "name": "Easy cooking"
+//                 }
+//             ]
+//         },
+//         {
+//             "id": 67,
+//             "title": "How to eat an omelette",
+//             "published": true,
+//             "authorId": 40,
+//             "comments": null,
+//             "views": 0,
+//             "likes": 0,
+//             "categories": []
+//         }
+//     ]
+// }
+```
+
+##### Select
+您可以使用嵌套选择来选择要返回的关系字段的子集。
+
+```ts
+const user = await prisma.user.findFirst({
+  select: {
+    name: true,
+    posts: {
+      select: {
+        title: true,
+      },
+    },
+  },
+})
+
+
+// {
+//   name: "Elsa",
+//   posts: [ { title: 'My first post' }, { title: 'How to make cookies' } ]
+// }
+```
+
+###### 嵌套使用 Include 和 Select
+```ts
+const user = await prisma.user.findFirst({
+  include: {
+    posts: {
+      select: {
+        title: true,
+      },
+    },
+  },
+})
+
+// {
+//   "id": 1,
+//   "name": null,
+//   "email": "martina@prisma.io",
+//   "profileViews": 0,
+//   "role": "USER",
+//   "coinflips": [],
+//   "posts": [
+//     { "title": "How to grow salad" },
+//     { "title": "How to ride a horse" }
+//   ]
+// }
+
+```
+
+###### 不能在同一级别使用 Select 和 Include
+请注意，您不能在同一级别上使用 `select` 和 `include`。
+```ts
+// The following query returns an exception
+const user = await prisma.user.findFirst({
+  select: { // This won't work!
+    email:  true
+  }
+  include: { // This won't work!
+    posts: {
+      select: {
+        title: true
+      }
+    }
+  },
+})
+```
+相反，使用嵌套选择选项：
+```ts
+const user = await prisma.user.findFirst({
+  select: {
+    // This will work!
+    email: true,
+    posts: {
+      select: {
+        title: true,
+      },
+    },
+  },
+})
+```
+
+#### 关系计数
+您可以在`include`或`select`内字段旁边使用关系计数 
+```ts
+const relationCount = await prisma.user.findMany({
+  include: {
+    _count: {
+      select: { posts: true },
+    },
+  },
+})
+
+// { id: 1, _count: { posts: 3 } },
+// { id: 2, _count: { posts: 2 } },
+// { id: 3, _count: { posts: 2 } },
+// { id: 4, _count: { posts: 0 } },
+// { id: 5, _count: { posts: 0 } }
+```
+
 
 #### filter a list of relations
+当您使用 `select` 或 `include` 返回相关数据的子集时，您可以对 `select` 或 `include` 内的关系列表进行过滤和排序。
+```ts
+const result = await prisma.user.findFirst({
+  select: {
+    posts: {
+      where: {
+        published: false,
+      },
+      orderBy: {
+        title: 'asc',
+      },
+      select: {
+        title: true,
+      },
+    },
+  },
+})
+
+// 您还可以使用 include 编写相同的查询，如下所示：
+const result = await prisma.user.findFirst({
+  include: {
+    posts: {
+      where: {
+        published: false,
+      },
+      orderBy: {
+        title: 'asc',
+      },
+    },
+  },
+})
+```
+
+#### 嵌套写入
+嵌套写入允许您在单个事务中将关系数据写入数据库。
+- 为在单个 Prisma 客户端查询中跨多个表创建、更新或删除数据提供事务保证。如果查询的任何部分失败（例如，创建用户成功但创建帖子失败），Prisma 客户端将回滚所有更改。
+- 支持数据模型支持的任何级别的嵌套。
+- 使用模型的创建或更新查询时可用于关系字段。
+
+##### 创建相关记录​
+您可以同时创建一条记录和一条或多条相关记录。以下查询创建一条 User 记录和两条相关的 Post 记录：
+```ts
+const result = await prisma.user.create({
+  data: {
+    email: 'elsa@prisma.io',
+    name: 'Elsa Prisma',
+    posts: {
+      create: [
+        { title: 'How to make an omelette' },
+        { title: 'How to eat an omelette' },
+      ],
+    },
+  },
+  include: {
+    posts: true, // Include all posts in the returned object
+  },
+})
+
+
+// {
+//   id: 29,
+//   name: 'Elsa',
+//   email: 'elsa@prisma.io',
+//   profileViews: 0,
+//   role: 'USER',
+//   coinflips: [],
+//   posts: [
+//     {
+//       id: 22,
+//       title: 'How to make an omelette',
+//       published: true,
+//       authorId: 29,
+//       comments: null,
+//       views: 0,
+//       likes: 0
+//     },
+//     {
+//       id: 23,
+//       title: 'How to eat an omelette',
+//       published: true,
+//       authorId: 29,
+//       comments: null,
+//       views: 0,
+//       likes: 0
+//     }
+//   ]
+// }
+```
+
+##### 创建单个记录和多个相关记录​
+- 使用嵌套 `create` 查询
+- 使用嵌套的 `createMany` 查询
+在大多数情况下，除非需要`skipDuplicates` 查询选项，否则嵌套`create`会更好。这是一个描述这两个选项之间差异的快速表格：
+
+| feature          | create | createMany | notes                                                                                                                                |
+| ---------------- | ------ | ---------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| 支持嵌套附加关系 | ✔      | ✘ *        | 例如，您可以在一个查询中创建一个用户、多个帖子以及每个帖子的多个评论。<br/> * 您可以在一对一关系中手动设置外键 - 例如：{authorId: 9} |
+| 支持1-n关系      | ✔      | ✔          | 例如，您可以创建一个用户和多个帖子（一个用户有多个帖子）                                                                             |
+| 支持m-n关系      | ✔      | ✘          | 例如，您可以创建一个帖子和多个类别（一个帖子可以有多个类别，一个类别可以有多个帖子）                                                 |
+| 支持跳过重复记录 | ✘      | ✔          | 使用skipDuplicates 查询选项。                                                                                                        |
+
+###### 使用嵌套 create 
+
+```ts
+const result = await prisma.user.create({
+  data: {
+    email: 'yvette@prisma.io',
+    name: 'Yvette',
+    posts: {
+      create: [
+        {
+          title: 'How to make an omelette',
+          categories: {
+            create: {
+              name: 'Easy cooking',
+            },
+          },
+        },
+        { title: 'How to eat an omelette' },
+      ],
+    },
+  },
+  include: {
+    // Include posts
+    posts: {
+      include: {
+        categories: true, // Include post categories
+      },
+    },
+  },
+})
+```
+
+###### 使用嵌套 createMany
+
+```ts
+const result = await prisma.user.create({
+  data: {
+    email: 'saanvi@prisma.io',
+    posts: {
+      createMany: {
+        data: [{ title: 'My first post' }, { title: 'My second post' }],
+      },
+    },
+  },
+  include: {
+    posts: true,
+  },
+})
+```
+
+##### 创建多条记录和多条相关记录​
+您无法访问 `createMany()` 或 `createManyAndReturn()` 查询中的关系，这意味着您无法在单个嵌套写入中创建多个用户和多个帖子。以下情况是不可能的：
+
+```ts
+const createMany = await prisma.user.createMany({
+  data: [
+    {
+      name: 'Yewande',
+      email: 'yewande@prisma.io',
+      posts: {
+        // Not possible to create posts!
+      },
+    },
+    {
+      name: 'Noor',
+      email: 'noor@prisma.io',
+      posts: {
+        // Not possible to create posts!
+      },
+    },
+  ],
+})
+```
+
+##### 连接多个记录​
+以下查询创建 (create ) 一条新用户记录并将该记录连接 (connect ) 到三个现有帖子：
+```ts
+const result = await prisma.user.create({
+  data: {
+    email: 'vlad@prisma.io',
+    posts: {
+      connect: [{ id: 8 }, { id: 9 }, { id: 10 }],
+    },
+  },
+  include: {
+    posts: true, // Include all posts in the returned object
+  },
+})
+```
+
+
+##### 连接单个记录​
+您可以将现有记录连接到新用户或现有用户。以下查询将现有帖子 (id: 11) 连接到现有用户 (id: 9)
+
+```ts
+const result = await prisma.user.update({
+  where: {
+    id: 9,
+  },
+  data: {
+    posts: {
+      connect: {
+        id: 11,
+      },
+    },
+  },
+  include: {
+    posts: true,
+  },
+})
+```
+
+##### 连接单个记录​
+如果相关记录可能存在或不存在，请使用 `connectOrCreate` 连接相关记录：
+```ts
+const result = await prisma.post.create({
+  data: {
+    title: 'How to make croissants',
+    author: {
+      connectOrCreate: {
+        where: {
+          email: 'viola@prisma.io',
+        },
+        create: {
+          email: 'viola@prisma.io',
+          name: 'Viola',
+        },
+      },
+    },
+  },
+  include: {
+    author: true,
+  },
+})
+```
+
+##### 断开相关记录​
+要断开记录列表中的一个（例如，特定的博客文章），请提供要断开连接的记录的 ID 或唯一标识符：
+```ts
+const result = await prisma.user.update({
+  where: {
+    id: 16,
+  },
+  data: {
+    posts: {
+      disconnect: [{ id: 12 }, { id: 19 }],
+    },
+  },
+  include: {
+    posts: true,
+  },
+})
+```
+
+要断开一条记录（例如，帖子的作者），请使用`disconnect: true`：
+```ts
+const result = await prisma.post.update({
+  where: {
+    id: 23,
+  },
+  data: {
+    author: {
+      disconnect: true,
+    },
+  },
+  include: {
+    author: true,
+  },
+})
+```
+
+##### 断开所有相关记录​
+要断开一对多关系中的所有相关记录（用户有许多帖子），请将关系设置为空列表，如下所示：
+```ts
+const result = await prisma.user.update({
+  where: {
+    id: 16,
+  },
+  data: {
+    posts: {
+      set: [],
+    },
+  },
+  include: {
+    posts: true,
+  },
+})
+```
+
+##### 断开所有相关记录​
+删除所有相关的Post记录：
+```ts
+const result = await prisma.user.update({
+  where: {
+    id: 11,
+  },
+  data: {
+    posts: {
+      deleteMany: {},
+    },
+  },
+  include: {
+    posts: true,
+  },
+})
+```
+
+##### 断开所有相关记录​
+通过删除所有未发布的帖子来更新用户：
+```ts
+const result = await prisma.user.update({
+  where: {
+    id: 11,
+  },
+  data: {
+    posts: {
+      deleteMany: {
+        published: false,
+      },
+    },
+  },
+  include: {
+    posts: true,
+  },
+})
+```
+
+通过删除特定帖子来更新用户：
+```ts
+const result = await prisma.user.update({
+  where: {
+    id: 6,
+  },
+  data: {
+    posts: {
+      deleteMany: [{ id: 7 }],
+    },
+  },
+  include: {
+    posts: true,
+  },
+})
+```
+
+
+##### 更新所有相关记录（或过滤器）​
+您可以使用嵌套的 `updateMany` 来更新特定用户的所有相关记录。以下查询取消发布特定用户的所有帖子：
+```ts
+const result = await prisma.user.update({
+  where: {
+    id: 6,
+  },
+  data: {
+    posts: {
+      updateMany: {
+        where: {
+          published: true,
+        },
+        data: {
+          published: false,
+        },
+      },
+    },
+  },
+  include: {
+    posts: true,
+  },
+})
+```
+
+##### 更新具体相关记录​​
+```ts
+const result = await prisma.user.update({
+  where: {
+    id: 6,
+  },
+  data: {
+    posts: {
+      update: {
+        where: {
+          id: 9,
+        },
+        data: {
+          title: 'My updated title',
+        },
+      },
+    },
+  },
+  include: {
+    posts: true,
+  },
+})
+```
+
+##### 更新或创建相关记录​
+以下查询使用嵌套 `upsert` 来更新“bob@prisma.io”（如果该用户存在），或者创建该用户（如果不存在）：
+```ts
+const result = await prisma.post.update({
+  where: {
+    id: 6,
+  },
+  data: {
+    author: {
+      upsert: {
+        create: {
+          email: 'bob@prisma.io',
+          name: 'Bob the New User',
+        },
+        update: {
+          email: 'bob@prisma.io',
+          name: 'Bob the existing user',
+        },
+      },
+    },
+  },
+  include: {
+    author: true,
+  },
+})
+```
+
+##### 将新的相关记录添加到现有记录​
+您可以将 `create` 或 `createMany` 嵌套在更新内，以将新的相关记录添加到现有记录。以下查询向 id 为 9 的用户添加两个帖子：
+```ts
+const result = await prisma.user.update({
+  where: {
+    id: 9,
+  },
+  data: {
+    posts: {
+      createMany: {
+        data: [{ title: 'My first post' }, { title: 'My second post' }],
+      },
+    },
+  },
+  include: {
+    posts: true,
+  },
+})
+```
+
+#### 关系过滤器​
+
+##### 过滤 “-to-many” 关系
+Prisma 客户端提供了 `some`、`every` 和 `none` 选项，用于根据关系的“对多”端相关记录的属性来过滤记录。
+例如，以下查询返回满足以下条件的用户：
+- 没有帖子的浏览量超过 100 次
+- 所有帖子的点赞数均小于或等于 50
+```ts
+const users = await prisma.user.findMany({
+  where: {
+    posts: {
+      none: {
+        views: {
+          gt: 100,
+        },
+      },
+      every: {
+        likes: {
+          lte: 50,
+        },
+      },
+    },
+  },
+  include: {
+    posts: true,
+  },
+})
+```
+
+##### 过滤 “-to-one” 关系
+Prisma 客户端提供 `is` 和 `isNot` 选项，用于根据关系的“一对一”侧相关记录的属性来过滤记录。
+例如，以下查询返回满足以下条件的 Post 记录：
+- 作者的名字不能是 “Bob”
+- 作者的年龄大于40
+```ts
+const users = await prisma.post.findMany({
+  where: {
+    author: {
+      isNot: {
+        name: 'Bob',
+      },
+      is: {
+        age: {
+          gt: 40,
+        },
+      },
+    },
+  },
+  include: {
+    author: true,
+  },
+})
+```
+
+##### 过滤缺少 “-to-many” 关系
+例如，以下查询使用 `none` 返回具有零个帖子的所有用户
+```ts
+const usersWithZeroPosts = await prisma.user.findMany({
+  where: {
+    posts: {
+      none: {},
+    },
+  },
+  include: {
+    posts: true,
+  },
+})
+```
+
+##### 过滤不存在的 “-to-one” 关系
+以下查询返回所有没有作者关系的帖子：
+```ts
+const postsWithNoAuthor = await prisma.post.findMany({
+  where: {
+    author: null, // or author: { }
+  },
+  include: {
+    author: true,
+  },
+})
+```
+
+
+##### 过滤相关记录的存在​
+以下查询返回至少拥有一篇帖子的所有用户：
+```ts
+const usersWithSomePosts = await prisma.user.findMany({
+  where: {
+    posts: {
+      some: {},
+    },
+  },
+  include: {
+    posts: true,
+  },
+})
+```
+
+#### Fluent API
+流畅的 API 让您可以通过函数调用流畅地遍历模型的关系。请注意，最后一个函数调用确定整个查询的返回类型（在下面的代码片段中添加相应的类型注释以使其明确）。
+此查询返回特定用户的所有帖子记录：
+```ts
+const postsByUser: Post[] = await prisma.user
+  .findUnique({ where: { email: 'alice@prisma.io' } })
+  .posts()
+```
+这相当于以下 findMany 查询：
+```ts
+const postsByUser = await prisma.post.findMany({
+  where: {
+    author: {
+      email: 'alice@prisma.io',
+    },
+  },
+})
+```
+查询之间的主要区别在于，流畅的 API 调用被转换为两个单独的数据库查询，而另一个仅生成单个查询（[请参阅此 GitHub 问题](https://github.com/prisma/prisma/issues/1984)）
+
+
+请注意，您可以根据需要链接任意数量的查询。在此示例中，链接从“个人资料”开始，然后经过“用户”到“帖子”：
+```ts
+const posts: Post[] = await prisma.profile
+  .findUnique({ where: { id: 1 } })
+  .user()
+  .posts()
+```
+链接的唯一要求是先前的函数调用必须仅返回单个对象（例如，由 findUnique 查询或像 profile.user() 这样的“一对一关系”返回）。
+
+以下查询是不可能的，因为 findMany 不返回单个对象而是一个列表：
+```ts
+// This query is illegal
+const posts = await prisma.user.findMany().posts()
+```
 
 ### Filtering and Sorting
 
