@@ -2878,6 +2878,255 @@ const posts = await prisma.user.findMany().posts()
 
 ### Filtering and Sorting
 
+Prisma Client 支持使用 `where` 查询选项进行过滤，并使用 `orderBy` 查询选项进行排序。
+
+#### 过滤（Filtering）
+Prisma Client 允许您根据模型字段的任意组合（包括相关模型）过滤记录，并支持多种过滤条件。
+
+##### 过滤条件和运算符​
+请参阅 Prisma Client 的[参考文档](https://www.prisma.io/docs/orm/reference/prisma-client-reference#filter-conditions-and-operators)以获取运算符的完整列表，例如startsWith和contains。
+
+
+##### 组合运算符​
+您可以使用运算符（例如 `NOT` 和 `OR` ）按条件组合进行过滤。以下查询返回电子邮件以“prisma.io”或“gmail.com”结尾但不以“hotmail.com”结尾的所有用户：
+```ts
+const result = await prisma.user.findMany({
+  where: {
+    OR: [
+      {
+        email: {
+          endsWith: 'prisma.io',
+        },
+      },
+      { email: { endsWith: 'gmail.com' } },
+    ],
+    NOT: {
+      email: {
+        endsWith: 'hotmail.com',
+      },
+    },
+  },
+  select: {
+    email: true,
+  },
+})
+```
+
+##### 过滤空字段​
+以下查询返回内容字段为 `null` 的所有帖子：
+```ts
+const posts = await prisma.post.findMany({
+  where: {
+    content: null,
+  },
+})
+```
+
+##### 过滤非空字段​
+以下查询返回内容字段不为空的所有帖子：
+```ts
+const posts = await prisma.post.findMany({
+  where: {
+    content: { not: null },
+  },
+})
+```
+
+##### 过滤关系​
+Prisma Client 支持对相关记录进行过滤。例如，在以下架构中，用户可以拥有许多博客文章：
+用户和帖子之间的一对多关系允许您根据帖子查询用户 - 例如，以下查询返回至少一个帖子（某些）具有超过 10 次浏览的所有用户：
+```ts
+const result = await prisma.user.findMany({
+  where: {
+    posts: {
+      some: {
+        views: {
+          gt: 10,
+        },
+      },
+    },
+  },
+})
+```
+
+您还可以根据作者的属性查询帖子。例如，以下查询返回作者电子邮件包含“prisma.io”的所有帖子：
+```ts
+const res = await prisma.post.findMany({
+  where: {
+    author: {
+      email: {
+        contains: 'prisma.io',
+      },
+    },
+  },
+})
+```
+
+##### 对标量列表/数组进行过滤​
+标量列表（例如，String[]）具有一组特殊的过滤条件 - 例如，以下查询返回标签数组包含数据库的所有帖子：
+
+```ts
+const posts = await client.post.findMany({
+  where: {
+    tags: {
+      has: 'databases',
+    },
+  },
+})
+```
+
+
+##### 不区分大小写的过滤​
+不区分大小写的过滤可作为 **PostgreSQL** 和 **MongoDB** 提供商的一项功能。 MySQL、MariaDB 和 Microsoft SQL Server 默认情况下不区分大小写，并且不需要 Prisma 客户端功能即可实现不区分大小写的过滤。
+要使用不区分大小写的过滤，请将 `mode` 属性添加到特定过滤器并指定不敏感：
+```ts
+const users = await prisma.user.findMany({
+  where: {
+    email: {
+      endsWith: 'prisma.io',
+      mode: 'insensitive', // Default value: default
+    },
+    name: {
+      equals: 'Archibald', // Default mode
+    },
+  },
+})
+```
+另请参阅：[区分大小写](#case-sensitivity)
+
+##### 过滤常见问题解答​
+
+###### 数据库级别的过滤如何工作？
+对于 MySQL 和 PostgreSQL，Prisma 客户端利用 `LIKE`（和 `ILIKE`）运算符来搜索给定模式。运算符具有使用 `LIKE` 特有符号的内置模式匹配。模式匹配符号包括 `%` 表示零个或多个字符（类似于其他正则表达式实现中的 `*`）和 `_` 表示一个字符（类似于 `.`）
+
+要匹配文字字符 % 或 _，请确保对这些字符进行转义。例如：
+```ts
+const users = await prisma.user.findMany({
+  where: {
+    name: {
+      startsWith: '_benny',
+    },
+  },
+})
+```
+
+上面的查询将匹配名称以字符开头后跟 benny 的任何用户，例如 7benny 或 &benny。如果您想查找名称以文字字符串 _benny 开头的任何用户，您可以这样做：
+```ts
+const users = await prisma.user.findMany({
+  where: {
+    name: {
+      startsWith: '\\_benny', // note that the `_` character is escaped, preceding `\` with `\` when included in a string
+    },
+  },
+})
+```
+
+#### 排序（Sorting）
+使用 `orderBy` 按特定字段或字段集对记录列表或嵌套记录列表进行排序。例如，以下查询返回按角色和名称排序的所有用户记录，以及按标题排序的每个用户的帖子：
+```ts
+const usersWithPosts = await prisma.user.findMany({
+  orderBy: [
+    {
+      role: 'desc',
+    },
+    {
+      name: 'desc',
+    },
+  ],
+  include: {
+    posts: {
+      orderBy: {
+        title: 'desc',
+      },
+      select: {
+        title: true,
+      },
+    },
+  },
+})
+```
+
+##### 按关系排序​
+您还可以按关系的属性进行排序。例如，以下查询按作者的电子邮件地址对所有帖子进行排序：
+```ts
+const posts = await prisma.post.findMany({
+  orderBy: {
+    author: {
+      email: 'asc',
+    },
+  },
+})
+```
+
+##### 按关系聚合值排序​
+您可以按相关记录的计数进行排序。例如，以下查询按相关帖子的数量对用户进行排序：
+```ts
+const getActiveUsers = await prisma.user.findMany({
+  take: 10,
+  orderBy: {
+    posts: {
+      _count: 'desc',
+    },
+  },
+})
+```
+
+
+##### 按相关性排序（PostgreSQL 和 MySQL）​
+在 PostgreSQL 3.5.0+ 和 MySQL 3.8.0+ 中，您可以使用 `_relevance` 关键字按与查询的相关性对记录进行排序。这使用全文搜索功能的相关性排名功能。
+[PostgreSQL 文档](https://www.postgresql.org/docs/12/textsearch-controls.html) 和 [MySQL 文档](https://dev.mysql.com/doc/refman/8.0/en/fulltext-search.html) 中进一步解释了此功能。
+使用 `fullTextSearch` 预览功能启用按相关性排序：
+```prisma
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["fullTextSearch"]
+}
+```
+按相关性排序可以单独使用或与搜索过滤器一起使用：`_relevance` 用于对列表进行排序，而搜索则过滤无序列表。
+例如，以下查询使用 `_relevance` 按bio字段中的术语developer进行过滤，然后按相关性升序对结果进行排序：
+```ts
+const getUsersByRelevance = await prisma.user.findMany({
+  take: 10,
+  orderBy: {
+    _relevance: {
+      fields: ['bio'],
+      search: 'developer',
+      sort: 'asc',
+    },
+  },
+})
+```
+
+##### 首先或最后以空记录排序​
+您可以对结果进行排序，以便具有空字段的记录出现在最前面或最后。
+
+- 此功能**不适用于 MongoDB**。
+- 您只能按**可选标量字段**上的空值进行排序。如果您尝试按必填字段或关系字段上的空值进行排序，Prisma 客户端会抛出 P2009 错误。
+
+如果 name 是可选字段，则以下查询使用 `last` 按名称对用户进行排序，末尾为空记录：
+```ts
+const users = await prisma.user.findMany({
+  orderBy: {
+    updatedAt: { sort: 'asc', nulls: 'last' },
+  },
+})
+```
+
+如果您希望具有空值的记录出现在返回数组的开头，请首先使用：
+```ts
+const users = await prisma.user.findMany({
+  orderBy: {
+    updatedAt: { sort: 'asc', nulls: 'first' },
+  },
+})
+```
+请注意，`first` 也是默认值，因此如果省略 `null` 选项，则 `null` 值将首先出现在返回的数组中。
+
+
+##### 排序常见问题解答​
+- [我可以执行不区分大小写的排序吗？​](https://github.com/prisma/prisma-client-js/issues/841)
+
+
 ### Pagination
 
 ### Aggregation,grouping,and summarizing
