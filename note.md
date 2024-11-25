@@ -3302,8 +3302,394 @@ const firstQueryResults = await prisma.post.findMany({
 })
 ```
 
-
 ### Aggregation,grouping,and summarizing
+Prisma 客户端允许您对记录进行计数、聚合数字字段并选择不同的字段值。
+
+#### Aggregation(聚合)
+Prisma Client 允许您聚合模型的数字字段（例如 `Int` 和 `Float`）。
+以下查询返回所有用户的平均年龄：
+```ts
+const aggregations = await prisma.user.aggregate({
+  _avg: {
+    age: true,
+  },
+})
+
+console.log('Average age:' + aggregations._avg.age)
+```
+
+您可以将聚合与过滤和排序结合起来。例如，以下查询返回用户的平均年龄：
+```ts
+const aggregations = await prisma.user.aggregate({
+  _avg: {
+    age: true,
+  },
+  where: {
+    email: {
+      contains: 'prisma.io',
+    },
+  },
+  orderBy: {
+    age: 'asc',
+  },
+  take: 10,
+})
+
+console.log('Average age:' + aggregations._avg.age)
+```
+
+##### 聚合值可以为空​
+可为空字段的聚合可以返回数字或 `null`。这不包括 `count`，如果未找到记录，则始终返回 0。
+```ts
+const aggregations = await prisma.user.aggregate({
+  _avg: {
+    age: true,
+  },
+  _count: {
+    age: true,
+  },
+})
+
+// {
+//   _avg: {
+//     age: null
+//   },
+//   _count: {
+//     age: 9
+//   }
+// }
+```
+在以下任一情况下，查询返回 { _avg: { Age: null } }：
+- 没有用户
+- 每个用户的年龄字段值为空
+这使您可以区分真实聚合值（可能为零）和无数据。
+
+#### Group by(分组)
+Prisma Client 的 `groupBy()` 允许您按一个或多个字段值（例如国家或国家和城市）对记录进行分组，并对每个组执行聚合，例如查找居住在特定城市的人们的平均年龄。
+以下示例按国家/地区字段对所有用户进行分组，并返回每个国家/地区的个人资料查看总数：
+```ts
+const groupUsers = await prisma.user.groupBy({
+  by: ['country'],
+  _sum: {
+    profileViews: true,
+  },
+})
+
+// [
+//   { country: 'Germany', _sum: { profileViews: 126 } },
+//   { country: 'Sweden', _sum: { profileViews: 0 } },
+// ]
+```
+
+如果 `by` 选项中有单个元素，则可以使用以下简写语法来表达查询：
+```ts
+const groupUsers = await prisma.user.groupBy({
+  by: 'country',
+})
+```
+
+##### groupBy() 和过滤​
+`groupBy()` 支持两个级别的过滤：`where` 和`having`。
+
+
+###### 使用 where 过滤记录​
+分组前使用`where`过滤所有记录。
+以下示例按国家/地区和汇总个人资料视图对用户进行分组，但仅包括电子邮件地址包含 prisma.io 的用户：
+```ts
+const groupUsers = await prisma.user.groupBy({
+  by: ['country'],
+  where: {
+    email: {
+      contains: 'prisma.io',
+    },
+  },
+  _sum: {
+    profileViews: true,
+  },
+})
+```
+
+###### 使用 having 过滤组
+`having` 必须按**聚合值**（例如字段的总和或平均值）而不是单个记录来过滤整个组
+例如，仅返回平均 profileViews 大于 100 的组：
+```ts
+const groupUsers = await prisma.user.groupBy({
+  by: ['country'],
+  where: {
+    email: {
+      contains: 'prisma.io',
+    },
+  },
+  _sum: {
+    profileViews: true,
+  },
+  having: {
+    profileViews: {
+      _avg: {
+        gt: 100,
+      },
+    },
+  },
+})
+```
+
+###### 使用 having 的用例
+`having`的主要用例是过滤聚合。
+我们建议您在分组之前使用 `where` 来尽可能减小数据集的大小，因为这样做可以减少数据库必须返回的记录数，并且可以利用索引。
+例如，以下查询对非瑞典或加纳的所有用户进行分组：
+```ts
+const fd = await prisma.user.groupBy({
+  by: ['country'],
+  where: {
+    country: {
+      notIn: ['Sweden', 'Ghana'],
+    },
+  },
+  _sum: {
+    profileViews: true,
+  },
+  having: {
+    profileViews: {
+      _min: {
+        gte: 10,
+      },
+    },
+  },
+})
+```
+
+以下查询在技术上实现了相同的结果，但在分组后排除了来自加纳的用户。这不会带来任何好处，也不推荐这样做。
+```ts
+const groupUsers = await prisma.user.groupBy({
+  by: ['country'],
+  where: {
+    country: {
+      not: 'Sweden',
+    },
+  },
+  _sum: {
+    profileViews: true,
+  },
+  having: {
+    country: {
+      not: 'Ghana',
+    },
+    profileViews: {
+      _min: {
+        gte: 10,
+      },
+    },
+  },
+})
+```
+
+
+##### groupBy() 和排序​
+当组合 `groupBy()` 和 `orderBy` 时，以下约束适用：
+- 您可以 `orderBy`,`by` 中存在的字段
+- 您可以`orderBy`聚合
+- 如果您将`skip`和`take`与`groupBy()`一起使用，则还必须在查询中包含`orderBy`
+
+##### 按聚合组排序​
+您可以按聚合组订购。
+以下示例按每个城市组中的用户数量对该组进行排序（最大的组在前）：
+```ts
+const groupBy = await prisma.user.groupBy({
+  by: ['city'],
+  _count: {
+    city: true,
+  },
+  orderBy: {
+    _count: {
+      city: 'desc',
+    },
+  },
+})
+```
+
+##### 按字段排序​
+以下查询按国家/地区对组进行排序，跳过前两组，并返回第三组和第四组：
+```ts
+const groupBy = await prisma.user.groupBy({
+  by: ['country'],
+  _sum: {
+    profileViews: true,
+  },
+  orderBy: {
+    country: 'desc',
+  },
+  skip: 2,
+  take: 2,
+})
+
+```
+
+##### groupBy() 常见问题解答​
+
+###### 我可以将 `select` 与 `groupBy()` 一起使用吗？​
+您不能将 `select` 与` groupBy()` 一起使用。但是，`by` 中包含的所有字段都会自动返回。
+
+###### 在 `groupBy()` 中使用 `where` 和 `having` 有什么区别？​
+`where` 在分组之前过滤所有记录，`having` 过滤整个组并支持对聚合字段值进行过滤，例如该组中特定字段的平均值或总和。
+
+###### `groupBy()` 和 `distinct` 之间有什么区别？​
+`distinct` 和 `groupBy()` 都按一个或多个唯一字段值对记录进行分组。 `groupBy()` 允许您聚合每个组内的数据 - 例如，返回来自丹麦的帖子的平均浏览量 - 而 `distinct` 则不能。
+
+
+#### Count(计数)
+
+##### 计数记录​
+使用 `count()` 来统计记录或非空字段值的数量。以下示例查询对所有用户进行计数：
+```ts
+const userCount = await prisma.user.count()
+```
+
+##### 计数关系​
+要返回关系计数（例如，用户的帖子计数），请使用 `_count` 参数和嵌套选择，如下所示：
+```ts
+const usersWithCount = await prisma.user.findMany({
+  include: {
+    _count: {
+      select: { posts: true },
+    },
+  },
+})
+```
+
+`_count`参数：
+- 可以在顶级`include`或`select`内部使用
+- 可与任何返回记录的查询一起使用（包括`delete`、`update`和 `findFirst`）
+- 可以返回多个关系计数
+- 可以过滤关系计数
+
+###### 使用 `include` 返回关系计数
+以下查询在结果中包含每个用户的帖子计数：
+```ts
+const usersWithCount = await prisma.user.findMany({
+  include: {
+    _count: {
+      select: { posts: true },
+    },
+  },
+})
+```
+
+###### 使用 `select` 返回关系计数​
+以下查询使用 `select` 返回每个用户的帖子计数，不返回其他字段：
+```ts
+const usersWithCount = await prisma.user.findMany({
+  select: {
+    _count: {
+      select: { posts: true },
+    },
+  },
+})
+```
+
+###### 返回多个关系计数​
+以下查询返回每个用户的帖子和食谱的计数，不返回其他字段：
+```ts
+const usersWithCount = await prisma.user.findMany({
+  select: {
+    _count: {
+      select: {
+        posts: true,
+        recipes: true,
+      },
+    },
+  },
+})
+```
+
+###### 过滤关系计数​
+使用 `where` 来过滤 `_count` 输出类型返回的字段。您可以对*标量字段*、*关系字段*和*复合类型字段*执行此操作。
+例如，以下查询返回标题为“Hello!”的所有用户帖子：
+```ts
+// Count all user posts with the title "Hello!"
+await prisma.user.findMany({
+  select: {
+    _count: {
+      select: {
+        posts: { where: { title: 'Hello!' } },
+      },
+    },
+  },
+})
+```
+以下查询查找包含来自名为“Alice”的作者的评论的所有用户帖子：
+```ts
+// Count all user posts that have comments
+// whose author is named "Alice"
+await prisma.user.findMany({
+  select: {
+    _count: {
+      select: {
+        posts: {
+          where: { comments: { some: { author: { is: { name: 'Alice' } } } } },
+        },
+      },
+    },
+  },
+})
+```
+
+###### 计算非空字段值​
+您可以对所有记录以及非空字段值的所有实例进行计数。
+以下查询返回计数：
+- 所有用户记录 (`_all`)
+- 所有非空名称值（不是不同的值，只是不为空的值）
+
+```ts
+const userCount = await prisma.user.count({
+  select: {
+    _all: true, // Count all records
+    name: true, // Count all non-null field values
+  },
+})
+```
+
+###### 过滤计数​
+`count` 支持过滤。以下示例查询对拥有超过 100 个个人资料视图的所有用户进行计数：
+```ts
+const userCount = await prisma.user.count({
+  where: {
+    profileViews: {
+      gte: 100,
+    },
+  },
+})
+```
+
+以下示例查询对特定用户的帖子进行计数：
+```ts
+const postCount = await prisma.post.count({
+  where: {
+    authorId: 29,
+  },
+})
+```
+
+##### Select distinct
+Prisma 客户端允许您使用 `distinct` 过滤从 Prisma 查询响应到 `findMany` 查询的重复行。 `distinct` 通常与 `select` 结合使用，以识别表行中某些唯一的值组合。
+以下示例返回具有不同名称字段值的所有用户记录的所有字段：
+```ts
+const result = await prisma.user.findMany({
+  where: {},
+  distinct: ['name'],
+})
+```
+
+以下示例返回不同的角色字段值（例如 ADMIN 和 USER）：
+```ts
+const distinctRoles = await prisma.user.findMany({
+  distinct: ['role'],
+  select: {
+    role: true,
+  },
+})
+```
+
+###### [distinct under the hood](https://www.prisma.io/docs/orm/prisma-client/queries/aggregation-grouping-summarizing#distinct-under-the-hood)
 
 ### Transactions and batch queries
 
