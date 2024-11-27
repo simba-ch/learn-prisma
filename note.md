@@ -1881,22 +1881,25 @@ const deleteUsers = await prisma.user.deleteMany({
 ```
 
 ##### 删除多条记录 ​
-以下查询使用deleteMany()删除所有用户记录：
+
+以下查询使用 deleteMany()删除所有用户记录：
+
 ```ts
-const deleteUsers = await prisma.user.deleteMany({})
+const deleteUsers = await prisma.user.deleteMany({});
 ```
 
 ##### [级联删除（删除相关记录）](https://www.prisma.io/docs/orm/prisma-client/queries/crud#cascading-deletes-deleting-related-records)
 
-##### [删除所有表中的所有记录​](https://www.prisma.io/docs/orm/prisma-client/queries/crud#delete-all-records-from-all-tables)
-
+##### [删除所有表中的所有记录 ​](https://www.prisma.io/docs/orm/prisma-client/queries/crud#delete-all-records-from-all-tables)
 
 #### Advanced query examples
 
-##### 创建深度嵌套的记录树​ ​
+##### 创建深度嵌套的记录树 ​ ​
+
 1. 单个用户
 2. 两个新的相关帖子记录
 3. 连接或创建每个帖子的类别
+
 ```ts
 const u = await prisma.user.create({
   include: {
@@ -1907,42 +1910,42 @@ const u = await prisma.user.create({
     },
   },
   data: {
-    email: 'emma@prisma.io',
+    email: "emma@prisma.io",
     posts: {
       create: [
         {
-          title: 'My first post',
+          title: "My first post",
           categories: {
             connectOrCreate: [
               {
-                create: { name: 'Introductions' },
+                create: { name: "Introductions" },
                 where: {
-                  name: 'Introductions',
+                  name: "Introductions",
                 },
               },
               {
-                create: { name: 'Social' },
+                create: { name: "Social" },
                 where: {
-                  name: 'Social',
+                  name: "Social",
                 },
               },
             ],
           },
         },
         {
-          title: 'How to make cookies',
+          title: "How to make cookies",
           categories: {
             connectOrCreate: [
               {
-                create: { name: 'Social' },
+                create: { name: "Social" },
                 where: {
-                  name: 'Social',
+                  name: "Social",
                 },
               },
               {
-                create: { name: 'Cooking' },
+                create: { name: "Cooking" },
                 where: {
-                  name: 'Cooking',
+                  name: "Cooking",
                 },
               },
             ],
@@ -1951,13 +1954,16 @@ const u = await prisma.user.create({
       ],
     },
   },
-})
+});
 ```
 
 ### Select fields
+
 默认情况下，当查询返回记录（而不是计数）时，结果包括：
+
 - 模型的所有标量字段（包括枚举）
 - 模型上没有定义关系
+
 ```prisma
 model User {
   id        Int      @id @default(autoincrement())
@@ -1970,7 +1976,7 @@ model User {
 model Post {
   id        Int      @id @default(autoincrement())
   published Boolean  @default(false)
-  title     String  
+  title     String
   author    User?    @relation(fields: [authorId], references: [id])
   authorId  Int?
 }
@@ -1982,8 +1988,9 @@ enum Role {
 ```
 
 对 User 模型的查询将包括 id、email、name 和 role 字段（因为这些是标量字段），但不包括 posts 字段（因为这是一个关系字段）：
+
 ```ts
-const users = await prisma.user.findFirst()
+const users = await prisma.user.findFirst();
 // {
 //   id: 42,
 //   name: "Sabelle",
@@ -1993,6 +2000,7 @@ const users = await prisma.user.findFirst()
 ```
 
 如果您想自定义结果并返回不同的字段组合，您可以：
+
 - 使用 `select` 返回特定字段。您还可以通过选择关系字段来使用嵌套选择。
 - 使用 `omit` 从结果中排除特定字段。 `omit` 可以看作是 `select` 的“相反”。
 - 使用 `include` 来额外包含关系。
@@ -2000,16 +2008,17 @@ const users = await prisma.user.findFirst()
 在所有情况下，查询结果都将是静态类型的，确保您不会意外访问未从数据库中实际查询的任何字段。
 仅选择所需的字段和关系，而不是依赖默认选择集，可以减少响应的大小并提高查询速度。
 
-
 #### 选择特定字段
+
 使用 `select` 返回字段的子集而不是所有字段。以下示例仅返回电子邮件和姓名字段：
+
 ```ts
 const user = await prisma.user.findFirst({
   select: {
     email: true,
     name: true,
   },
-})
+});
 
 // {
 //   name: "Alice",
@@ -2017,7 +2026,8 @@ const user = await prisma.user.findFirst({
 // }
 ```
 
-#### 通过选择关系字段返回嵌套对象​
+#### 通过选择关系字段返回嵌套对象 ​
+
 ```ts
 const usersWithPostTitles = await prisma.user.findFirst({
   select: {
@@ -2026,7 +2036,7 @@ const usersWithPostTitles = await prisma.user.findFirst({
       select: { title: true },
     },
   },
-})
+});
 
 // {
 //   "name":"Sabelle",
@@ -2037,17 +2047,17 @@ const usersWithPostTitles = await prisma.user.findFirst({
 // }
 ```
 
+#### 省略特定字段 ​
 
-#### 省略特定字段​
 在某些情况下，您可能想要返回模型的大部分字段，仅排除一小部分字段。
-在这些情况下，您可以使用omit，它可以看作是select的对应项：
+在这些情况下，您可以使用 omit，它可以看作是 select 的对应项：
+
 ```ts
 const users = await prisma.user.findFirst({
   omit: {
-    password: true
-  }
-})
-
+    password: true,
+  },
+});
 
 // {
 //   id: 9
@@ -2060,62 +2070,70 @@ const users = await prisma.user.findFirst({
 // }
 ```
 
-
 ### Relation queries
+
 Prisma Client 的一个关键功能是能够查询两个或多个模型之间的关系。关系查询包括：
+
 - 通过 `select` 和 `include` 进行嵌套读取
 - 具有事务保证的嵌套写入
 - 过滤相关记录
 
-#### 嵌套读取​
+#### 嵌套读取 ​
+
 嵌套读取允许您从数据库中的多个表中读取相关数据。
 
 ##### Relation load strategies
+
 由于“relationLoadStrategy”选项当前处于预览状态，因此您需要通过 Prisma 架构文件中的“relationJoins”预览功能标志来启用它：
+
 ```prisma
 generator client {
   provider        = "prisma-client-js"
   previewFeatures = ["relationJoins"]
 }
 ```
+
 添加此标志后，您需要再次运行 prismagenerate 以重新生成 Prisma Client。此功能目前在 PostgreSQL、CockroachDB 和 MySQL 上可用。
 
 Prisma 客户端支持两种关系加载策略：
+
 - `join`（默认）：使用数据库级 LATERAL JOIN (PostgreSQL) 或相关子查询 (MySQL)，并通过对数据库的单个查询获取所有数据。
 - `query`：将多个查询发送到数据库（每个表一个）并在应用程序级别连接它们。
 
 这两个选项之间的另一个重要区别是`join`策略在数据库级别使用 JSON 聚合。这意味着它创建的 Prisma 客户端返回的 JSON 结构已经存在于数据库中，从而节省了应用程序级别的计算资源。
 
 您可以在任何支持包含或选择的查询中使用顶层的`relationLoadStrategy` 选项。
+
 ```ts
 const users = await prisma.user.findMany({
-  relationLoadStrategy: 'join', // or 'query'
+  relationLoadStrategy: "join", // or 'query'
   include: {
     posts: true,
   },
-})
+});
 
 const users = await prisma.user.findMany({
-  relationLoadStrategy: 'join', // or 'query'
+  relationLoadStrategy: "join", // or 'query'
   select: {
     posts: true,
   },
-})
+});
 ```
 
 ###### 何时使用哪种加载策略？​
+
 - 在大多数情况下，`join`策略（默认）会更有效。在 PostgreSQL 上，它结合使用 LATERAL JOIN 和 JSON 聚合来减少结果集中的冗余，并委托将查询结果转换为数据库服务器上预期的 JSON 结构的工作。在 MySQL 上，它使用相关子查询来通过单个查询获取结果。
 - 可能存在边缘情况，根据数据集和查询的特征，`query`可以提高性能。我们建议您分析数据库查询以识别这些情况。
 - 如果您希望节省数据库服务器上的资源并在应用程序服务器中执行繁重的数据合并和转换工作（这可能更容易扩展），请使用`query`。
 
 ##### Include
+
 ```ts
 const user = await prisma.user.findFirst({
   include: {
     posts: true,
   },
-})
-
+});
 
 // {
 //   id: 19,
@@ -2148,6 +2166,7 @@ const user = await prisma.user.findFirst({
 ```
 
 ###### 嵌套 Include
+
 ```ts
 const user = await prisma.user.findFirst({
   include: {
@@ -2157,7 +2176,7 @@ const user = await prisma.user.findFirst({
       },
     },
   },
-})
+});
 
 // {
 //     "id": 40,
@@ -2200,6 +2219,7 @@ const user = await prisma.user.findFirst({
 ```
 
 ##### Select
+
 您可以使用嵌套选择来选择要返回的关系字段的子集。
 
 ```ts
@@ -2212,8 +2232,7 @@ const user = await prisma.user.findFirst({
       },
     },
   },
-})
-
+});
 
 // {
 //   name: "Elsa",
@@ -2222,6 +2241,7 @@ const user = await prisma.user.findFirst({
 ```
 
 ###### 嵌套使用 Include 和 Select
+
 ```ts
 const user = await prisma.user.findFirst({
   include: {
@@ -2231,7 +2251,7 @@ const user = await prisma.user.findFirst({
       },
     },
   },
-})
+});
 
 // {
 //   "id": 1,
@@ -2245,11 +2265,12 @@ const user = await prisma.user.findFirst({
 //     { "title": "How to ride a horse" }
 //   ]
 // }
-
 ```
 
 ###### 不能在同一级别使用 Select 和 Include
+
 请注意，您不能在同一级别上使用 `select` 和 `include`。
+
 ```ts
 // The following query returns an exception
 const user = await prisma.user.findFirst({
@@ -2265,7 +2286,9 @@ const user = await prisma.user.findFirst({
   },
 })
 ```
+
 相反，使用嵌套选择选项：
+
 ```ts
 const user = await prisma.user.findFirst({
   select: {
@@ -2277,11 +2300,13 @@ const user = await prisma.user.findFirst({
       },
     },
   },
-})
+});
 ```
 
 #### 关系计数
-您可以在`include`或`select`内字段旁边使用关系计数 
+
+您可以在`include`或`select`内字段旁边使用关系计数
+
 ```ts
 const relationCount = await prisma.user.findMany({
   include: {
@@ -2289,7 +2314,7 @@ const relationCount = await prisma.user.findMany({
       select: { posts: true },
     },
   },
-})
+});
 
 // { id: 1, _count: { posts: 3 } },
 // { id: 2, _count: { posts: 2 } },
@@ -2298,9 +2323,10 @@ const relationCount = await prisma.user.findMany({
 // { id: 5, _count: { posts: 0 } }
 ```
 
-
 #### filter a list of relations
+
 当您使用 `select` 或 `include` 返回相关数据的子集时，您可以对 `select` 或 `include` 内的关系列表进行过滤和排序。
+
 ```ts
 const result = await prisma.user.findFirst({
   select: {
@@ -2309,14 +2335,14 @@ const result = await prisma.user.findFirst({
         published: false,
       },
       orderBy: {
-        title: 'asc',
+        title: "asc",
       },
       select: {
         title: true,
       },
     },
   },
-})
+});
 
 // 您还可以使用 include 编写相同的查询，如下所示：
 const result = await prisma.user.findFirst({
@@ -2326,38 +2352,41 @@ const result = await prisma.user.findFirst({
         published: false,
       },
       orderBy: {
-        title: 'asc',
+        title: "asc",
       },
     },
   },
-})
+});
 ```
 
 #### 嵌套写入
+
 嵌套写入允许您在单个事务中将关系数据写入数据库。
+
 - 为在单个 Prisma 客户端查询中跨多个表创建、更新或删除数据提供事务保证。如果查询的任何部分失败（例如，创建用户成功但创建帖子失败），Prisma 客户端将回滚所有更改。
 - 支持数据模型支持的任何级别的嵌套。
 - 使用模型的创建或更新查询时可用于关系字段。
 
-##### 创建相关记录​
+##### 创建相关记录 ​
+
 您可以同时创建一条记录和一条或多条相关记录。以下查询创建一条 User 记录和两条相关的 Post 记录：
+
 ```ts
 const result = await prisma.user.create({
   data: {
-    email: 'elsa@prisma.io',
-    name: 'Elsa Prisma',
+    email: "elsa@prisma.io",
+    name: "Elsa Prisma",
     posts: {
       create: [
-        { title: 'How to make an omelette' },
-        { title: 'How to eat an omelette' },
+        { title: "How to make an omelette" },
+        { title: "How to eat an omelette" },
       ],
     },
   },
   include: {
     posts: true, // Include all posts in the returned object
   },
-})
-
+});
 
 // {
 //   id: 29,
@@ -2389,36 +2418,37 @@ const result = await prisma.user.create({
 // }
 ```
 
-##### 创建单个记录和多个相关记录​
+##### 创建单个记录和多个相关记录 ​
+
 - 使用嵌套 `create` 查询
 - 使用嵌套的 `createMany` 查询
-在大多数情况下，除非需要`skipDuplicates` 查询选项，否则嵌套`create`会更好。这是一个描述这两个选项之间差异的快速表格：
+  在大多数情况下，除非需要`skipDuplicates` 查询选项，否则嵌套`create`会更好。这是一个描述这两个选项之间差异的快速表格：
 
-| feature          | create | createMany | notes                                                                                                                                |
-| ---------------- | ------ | ---------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| 支持嵌套附加关系 | ✔      | ✘ *        | 例如，您可以在一个查询中创建一个用户、多个帖子以及每个帖子的多个评论。<br/> * 您可以在一对一关系中手动设置外键 - 例如：{authorId: 9} |
-| 支持1-n关系      | ✔      | ✔          | 例如，您可以创建一个用户和多个帖子（一个用户有多个帖子）                                                                             |
-| 支持m-n关系      | ✔      | ✘          | 例如，您可以创建一个帖子和多个类别（一个帖子可以有多个类别，一个类别可以有多个帖子）                                                 |
-| 支持跳过重复记录 | ✘      | ✔          | 使用skipDuplicates 查询选项。                                                                                                        |
+| feature          | create | createMany | notes                                                                                                                                 |
+| ---------------- | ------ | ---------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| 支持嵌套附加关系 | ✔      | ✘ \*       | 例如，您可以在一个查询中创建一个用户、多个帖子以及每个帖子的多个评论。<br/> \* 您可以在一对一关系中手动设置外键 - 例如：{authorId: 9} |
+| 支持 1-n 关系    | ✔      | ✔          | 例如，您可以创建一个用户和多个帖子（一个用户有多个帖子）                                                                              |
+| 支持 m-n 关系    | ✔      | ✘          | 例如，您可以创建一个帖子和多个类别（一个帖子可以有多个类别，一个类别可以有多个帖子）                                                  |
+| 支持跳过重复记录 | ✘      | ✔          | 使用 skipDuplicates 查询选项。                                                                                                        |
 
-###### 使用嵌套 create 
+###### 使用嵌套 create
 
 ```ts
 const result = await prisma.user.create({
   data: {
-    email: 'yvette@prisma.io',
-    name: 'Yvette',
+    email: "yvette@prisma.io",
+    name: "Yvette",
     posts: {
       create: [
         {
-          title: 'How to make an omelette',
+          title: "How to make an omelette",
           categories: {
             create: {
-              name: 'Easy cooking',
+              name: "Easy cooking",
             },
           },
         },
-        { title: 'How to eat an omelette' },
+        { title: "How to eat an omelette" },
       ],
     },
   },
@@ -2430,7 +2460,7 @@ const result = await prisma.user.create({
       },
     },
   },
-})
+});
 ```
 
 ###### 使用嵌套 createMany
@@ -2438,49 +2468,52 @@ const result = await prisma.user.create({
 ```ts
 const result = await prisma.user.create({
   data: {
-    email: 'saanvi@prisma.io',
+    email: "saanvi@prisma.io",
     posts: {
       createMany: {
-        data: [{ title: 'My first post' }, { title: 'My second post' }],
+        data: [{ title: "My first post" }, { title: "My second post" }],
       },
     },
   },
   include: {
     posts: true,
   },
-})
+});
 ```
 
-##### 创建多条记录和多条相关记录​
+##### 创建多条记录和多条相关记录 ​
+
 您无法访问 `createMany()` 或 `createManyAndReturn()` 查询中的关系，这意味着您无法在单个嵌套写入中创建多个用户和多个帖子。以下情况是不可能的：
 
 ```ts
 const createMany = await prisma.user.createMany({
   data: [
     {
-      name: 'Yewande',
-      email: 'yewande@prisma.io',
+      name: "Yewande",
+      email: "yewande@prisma.io",
       posts: {
         // Not possible to create posts!
       },
     },
     {
-      name: 'Noor',
-      email: 'noor@prisma.io',
+      name: "Noor",
+      email: "noor@prisma.io",
       posts: {
         // Not possible to create posts!
       },
     },
   ],
-})
+});
 ```
 
-##### 连接多个记录​
+##### 连接多个记录 ​
+
 以下查询创建 (create ) 一条新用户记录并将该记录连接 (connect ) 到三个现有帖子：
+
 ```ts
 const result = await prisma.user.create({
   data: {
-    email: 'vlad@prisma.io',
+    email: "vlad@prisma.io",
     posts: {
       connect: [{ id: 8 }, { id: 9 }, { id: 10 }],
     },
@@ -2488,11 +2521,11 @@ const result = await prisma.user.create({
   include: {
     posts: true, // Include all posts in the returned object
   },
-})
+});
 ```
 
+##### 连接单个记录 ​
 
-##### 连接单个记录​
 您可以将现有记录连接到新用户或现有用户。以下查询将现有帖子 (id: 11) 连接到现有用户 (id: 9)
 
 ```ts
@@ -2510,23 +2543,25 @@ const result = await prisma.user.update({
   include: {
     posts: true,
   },
-})
+});
 ```
 
-##### 连接单个记录​
+##### 连接单个记录 ​
+
 如果相关记录可能存在或不存在，请使用 `connectOrCreate` 连接相关记录：
+
 ```ts
 const result = await prisma.post.create({
   data: {
-    title: 'How to make croissants',
+    title: "How to make croissants",
     author: {
       connectOrCreate: {
         where: {
-          email: 'viola@prisma.io',
+          email: "viola@prisma.io",
         },
         create: {
-          email: 'viola@prisma.io',
-          name: 'Viola',
+          email: "viola@prisma.io",
+          name: "Viola",
         },
       },
     },
@@ -2534,11 +2569,13 @@ const result = await prisma.post.create({
   include: {
     author: true,
   },
-})
+});
 ```
 
-##### 断开相关记录​
+##### 断开相关记录 ​
+
 要断开记录列表中的一个（例如，特定的博客文章），请提供要断开连接的记录的 ID 或唯一标识符：
+
 ```ts
 const result = await prisma.user.update({
   where: {
@@ -2552,10 +2589,11 @@ const result = await prisma.user.update({
   include: {
     posts: true,
   },
-})
+});
 ```
 
 要断开一条记录（例如，帖子的作者），请使用`disconnect: true`：
+
 ```ts
 const result = await prisma.post.update({
   where: {
@@ -2569,11 +2607,13 @@ const result = await prisma.post.update({
   include: {
     author: true,
   },
-})
+});
 ```
 
-##### 断开所有相关记录​
+##### 断开所有相关记录 ​
+
 要断开一对多关系中的所有相关记录（用户有许多帖子），请将关系设置为空列表，如下所示：
+
 ```ts
 const result = await prisma.user.update({
   where: {
@@ -2587,11 +2627,13 @@ const result = await prisma.user.update({
   include: {
     posts: true,
   },
-})
+});
 ```
 
-##### 断开所有相关记录​
-删除所有相关的Post记录：
+##### 断开所有相关记录 ​
+
+删除所有相关的 Post 记录：
+
 ```ts
 const result = await prisma.user.update({
   where: {
@@ -2605,11 +2647,13 @@ const result = await prisma.user.update({
   include: {
     posts: true,
   },
-})
+});
 ```
 
-##### 断开所有相关记录​
+##### 断开所有相关记录 ​
+
 通过删除所有未发布的帖子来更新用户：
+
 ```ts
 const result = await prisma.user.update({
   where: {
@@ -2625,10 +2669,11 @@ const result = await prisma.user.update({
   include: {
     posts: true,
   },
-})
+});
 ```
 
 通过删除特定帖子来更新用户：
+
 ```ts
 const result = await prisma.user.update({
   where: {
@@ -2642,12 +2687,13 @@ const result = await prisma.user.update({
   include: {
     posts: true,
   },
-})
+});
 ```
 
-
 ##### 更新所有相关记录（或过滤器）​
+
 您可以使用嵌套的 `updateMany` 来更新特定用户的所有相关记录。以下查询取消发布特定用户的所有帖子：
+
 ```ts
 const result = await prisma.user.update({
   where: {
@@ -2668,10 +2714,11 @@ const result = await prisma.user.update({
   include: {
     posts: true,
   },
-})
+});
 ```
 
-##### 更新具体相关记录​​
+##### 更新具体相关记录 ​​
+
 ```ts
 const result = await prisma.user.update({
   where: {
@@ -2684,7 +2731,7 @@ const result = await prisma.user.update({
           id: 9,
         },
         data: {
-          title: 'My updated title',
+          title: "My updated title",
         },
       },
     },
@@ -2692,11 +2739,13 @@ const result = await prisma.user.update({
   include: {
     posts: true,
   },
-})
+});
 ```
 
-##### 更新或创建相关记录​
+##### 更新或创建相关记录 ​
+
 以下查询使用嵌套 `upsert` 来更新“bob@prisma.io”（如果该用户存在），或者创建该用户（如果不存在）：
+
 ```ts
 const result = await prisma.post.update({
   where: {
@@ -2706,12 +2755,12 @@ const result = await prisma.post.update({
     author: {
       upsert: {
         create: {
-          email: 'bob@prisma.io',
-          name: 'Bob the New User',
+          email: "bob@prisma.io",
+          name: "Bob the New User",
         },
         update: {
-          email: 'bob@prisma.io',
-          name: 'Bob the existing user',
+          email: "bob@prisma.io",
+          name: "Bob the existing user",
         },
       },
     },
@@ -2719,11 +2768,13 @@ const result = await prisma.post.update({
   include: {
     author: true,
   },
-})
+});
 ```
 
-##### 将新的相关记录添加到现有记录​
+##### 将新的相关记录添加到现有记录 ​
+
 您可以将 `create` 或 `createMany` 嵌套在更新内，以将新的相关记录添加到现有记录。以下查询向 id 为 9 的用户添加两个帖子：
+
 ```ts
 const result = await prisma.user.update({
   where: {
@@ -2732,23 +2783,26 @@ const result = await prisma.user.update({
   data: {
     posts: {
       createMany: {
-        data: [{ title: 'My first post' }, { title: 'My second post' }],
+        data: [{ title: "My first post" }, { title: "My second post" }],
       },
     },
   },
   include: {
     posts: true,
   },
-})
+});
 ```
 
-#### 关系过滤器​
+#### 关系过滤器 ​
 
 ##### 过滤 “-to-many” 关系
+
 Prisma 客户端提供了 `some`、`every` 和 `none` 选项，用于根据关系的“对多”端相关记录的属性来过滤记录。
 例如，以下查询返回满足以下条件的用户：
+
 - 没有帖子的浏览量超过 100 次
 - 所有帖子的点赞数均小于或等于 50
+
 ```ts
 const users = await prisma.user.findMany({
   where: {
@@ -2768,20 +2822,23 @@ const users = await prisma.user.findMany({
   include: {
     posts: true,
   },
-})
+});
 ```
 
 ##### 过滤 “-to-one” 关系
+
 Prisma 客户端提供 `is` 和 `isNot` 选项，用于根据关系的“一对一”侧相关记录的属性来过滤记录。
 例如，以下查询返回满足以下条件的 Post 记录：
+
 - 作者的名字不能是 “Bob”
-- 作者的年龄大于40
+- 作者的年龄大于 40
+
 ```ts
 const users = await prisma.post.findMany({
   where: {
     author: {
       isNot: {
-        name: 'Bob',
+        name: "Bob",
       },
       is: {
         age: {
@@ -2793,11 +2850,13 @@ const users = await prisma.post.findMany({
   include: {
     author: true,
   },
-})
+});
 ```
 
 ##### 过滤缺少 “-to-many” 关系
+
 例如，以下查询使用 `none` 返回具有零个帖子的所有用户
+
 ```ts
 const usersWithZeroPosts = await prisma.user.findMany({
   where: {
@@ -2808,11 +2867,13 @@ const usersWithZeroPosts = await prisma.user.findMany({
   include: {
     posts: true,
   },
-})
+});
 ```
 
 ##### 过滤不存在的 “-to-one” 关系
+
 以下查询返回所有没有作者关系的帖子：
+
 ```ts
 const postsWithNoAuthor = await prisma.post.findMany({
   where: {
@@ -2821,12 +2882,13 @@ const postsWithNoAuthor = await prisma.post.findMany({
   include: {
     author: true,
   },
-})
+});
 ```
 
+##### 过滤相关记录的存在 ​
 
-##### 过滤相关记录的存在​
 以下查询返回至少拥有一篇帖子的所有用户：
+
 ```ts
 const usersWithSomePosts = await prisma.user.findMany({
   where: {
@@ -2837,43 +2899,50 @@ const usersWithSomePosts = await prisma.user.findMany({
   include: {
     posts: true,
   },
-})
+});
 ```
 
 #### Fluent API
+
 流畅的 API 让您可以通过函数调用流畅地遍历模型的关系。请注意，最后一个函数调用确定整个查询的返回类型（在下面的代码片段中添加相应的类型注释以使其明确）。
 此查询返回特定用户的所有帖子记录：
+
 ```ts
 const postsByUser: Post[] = await prisma.user
-  .findUnique({ where: { email: 'alice@prisma.io' } })
-  .posts()
+  .findUnique({ where: { email: "alice@prisma.io" } })
+  .posts();
 ```
+
 这相当于以下 findMany 查询：
+
 ```ts
 const postsByUser = await prisma.post.findMany({
   where: {
     author: {
-      email: 'alice@prisma.io',
+      email: "alice@prisma.io",
     },
   },
-})
+});
 ```
+
 查询之间的主要区别在于，流畅的 API 调用被转换为两个单独的数据库查询，而另一个仅生成单个查询（[请参阅此 GitHub 问题](https://github.com/prisma/prisma/issues/1984)）
 
-
 请注意，您可以根据需要链接任意数量的查询。在此示例中，链接从“个人资料”开始，然后经过“用户”到“帖子”：
+
 ```ts
 const posts: Post[] = await prisma.profile
   .findUnique({ where: { id: 1 } })
   .user()
-  .posts()
+  .posts();
 ```
+
 链接的唯一要求是先前的函数调用必须仅返回单个对象（例如，由 findUnique 查询或像 profile.user() 这样的“一对一关系”返回）。
 
 以下查询是不可能的，因为 findMany 不返回单个对象而是一个列表：
+
 ```ts
 // This query is illegal
-const posts = await prisma.user.findMany().posts()
+const posts = await prisma.user.findMany().posts();
 ```
 
 ### Filtering and Sorting
@@ -2881,60 +2950,69 @@ const posts = await prisma.user.findMany().posts()
 Prisma Client 支持使用 `where` 查询选项进行过滤，并使用 `orderBy` 查询选项进行排序。
 
 #### 过滤（Filtering）
+
 Prisma Client 允许您根据模型字段的任意组合（包括相关模型）过滤记录，并支持多种过滤条件。
 
-##### 过滤条件和运算符​
-请参阅 Prisma Client 的[参考文档](https://www.prisma.io/docs/orm/reference/prisma-client-reference#filter-conditions-and-operators)以获取运算符的完整列表，例如startsWith和contains。
+##### 过滤条件和运算符 ​
 
+请参阅 Prisma Client 的[参考文档](https://www.prisma.io/docs/orm/reference/prisma-client-reference#filter-conditions-and-operators)以获取运算符的完整列表，例如 startsWith 和 contains。
 
-##### 组合运算符​
+##### 组合运算符 ​
+
 您可以使用运算符（例如 `NOT` 和 `OR` ）按条件组合进行过滤。以下查询返回电子邮件以“prisma.io”或“gmail.com”结尾但不以“hotmail.com”结尾的所有用户：
+
 ```ts
 const result = await prisma.user.findMany({
   where: {
     OR: [
       {
         email: {
-          endsWith: 'prisma.io',
+          endsWith: "prisma.io",
         },
       },
-      { email: { endsWith: 'gmail.com' } },
+      { email: { endsWith: "gmail.com" } },
     ],
     NOT: {
       email: {
-        endsWith: 'hotmail.com',
+        endsWith: "hotmail.com",
       },
     },
   },
   select: {
     email: true,
   },
-})
+});
 ```
 
-##### 过滤空字段​
+##### 过滤空字段 ​
+
 以下查询返回内容字段为 `null` 的所有帖子：
+
 ```ts
 const posts = await prisma.post.findMany({
   where: {
     content: null,
   },
-})
+});
 ```
 
-##### 过滤非空字段​
+##### 过滤非空字段 ​
+
 以下查询返回内容字段不为空的所有帖子：
+
 ```ts
 const posts = await prisma.post.findMany({
   where: {
     content: { not: null },
   },
-})
+});
 ```
 
-##### 过滤关系​
+##### 过滤关系 ​
+
 Prisma Client 支持对相关记录进行过滤。例如，在以下架构中，用户可以拥有许多博客文章：
 用户和帖子之间的一对多关系允许您根据帖子查询用户 - 例如，以下查询返回至少一个帖子（某些）具有超过 10 次浏览的所有用户：
+
 ```ts
 const result = await prisma.user.findMany({
   where: {
@@ -2946,268 +3024,299 @@ const result = await prisma.user.findMany({
       },
     },
   },
-})
+});
 ```
 
 您还可以根据作者的属性查询帖子。例如，以下查询返回作者电子邮件包含“prisma.io”的所有帖子：
+
 ```ts
 const res = await prisma.post.findMany({
   where: {
     author: {
       email: {
-        contains: 'prisma.io',
+        contains: "prisma.io",
       },
     },
   },
-})
+});
 ```
 
-##### 对标量列表/数组进行过滤​
+##### 对标量列表/数组进行过滤 ​
+
 标量列表（例如，String[]）具有一组特殊的过滤条件 - 例如，以下查询返回标签数组包含数据库的所有帖子：
 
 ```ts
 const posts = await client.post.findMany({
   where: {
     tags: {
-      has: 'databases',
+      has: "databases",
     },
   },
-})
+});
 ```
 
+##### 不区分大小写的过滤 ​
 
-##### 不区分大小写的过滤​
 不区分大小写的过滤可作为 **PostgreSQL** 和 **MongoDB** 提供商的一项功能。 MySQL、MariaDB 和 Microsoft SQL Server 默认情况下不区分大小写，并且不需要 Prisma 客户端功能即可实现不区分大小写的过滤。
 要使用不区分大小写的过滤，请将 `mode` 属性添加到特定过滤器并指定不敏感：
+
 ```ts
 const users = await prisma.user.findMany({
   where: {
     email: {
-      endsWith: 'prisma.io',
-      mode: 'insensitive', // Default value: default
+      endsWith: "prisma.io",
+      mode: "insensitive", // Default value: default
     },
     name: {
-      equals: 'Archibald', // Default mode
+      equals: "Archibald", // Default mode
     },
   },
-})
+});
 ```
+
 另请参阅：[区分大小写](#case-sensitivity)
 
-##### 过滤常见问题解答​
+##### 过滤常见问题解答 ​
 
 ###### 数据库级别的过滤如何工作？
+
 对于 MySQL 和 PostgreSQL，Prisma 客户端利用 `LIKE`（和 `ILIKE`）运算符来搜索给定模式。运算符具有使用 `LIKE` 特有符号的内置模式匹配。模式匹配符号包括 `%` 表示零个或多个字符（类似于其他正则表达式实现中的 `*`）和 `_` 表示一个字符（类似于 `.`）
 
-要匹配文字字符 % 或 _，请确保对这些字符进行转义。例如：
+要匹配文字字符 % 或 \_，请确保对这些字符进行转义。例如：
+
 ```ts
 const users = await prisma.user.findMany({
   where: {
     name: {
-      startsWith: '_benny',
+      startsWith: "_benny",
     },
   },
-})
+});
 ```
 
-上面的查询将匹配名称以字符开头后跟 benny 的任何用户，例如 7benny 或 &benny。如果您想查找名称以文字字符串 _benny 开头的任何用户，您可以这样做：
+上面的查询将匹配名称以字符开头后跟 benny 的任何用户，例如 7benny 或 &benny。如果您想查找名称以文字字符串 \_benny 开头的任何用户，您可以这样做：
+
 ```ts
 const users = await prisma.user.findMany({
   where: {
     name: {
-      startsWith: '\\_benny', // note that the `_` character is escaped, preceding `\` with `\` when included in a string
+      startsWith: "\\_benny", // note that the `_` character is escaped, preceding `\` with `\` when included in a string
     },
   },
-})
+});
 ```
 
 #### 排序（Sorting）
+
 使用 `orderBy` 按特定字段或字段集对记录列表或嵌套记录列表进行排序。例如，以下查询返回按角色和名称排序的所有用户记录，以及按标题排序的每个用户的帖子：
+
 ```ts
 const usersWithPosts = await prisma.user.findMany({
   orderBy: [
     {
-      role: 'desc',
+      role: "desc",
     },
     {
-      name: 'desc',
+      name: "desc",
     },
   ],
   include: {
     posts: {
       orderBy: {
-        title: 'desc',
+        title: "desc",
       },
       select: {
         title: true,
       },
     },
   },
-})
+});
 ```
 
-##### 按关系排序​
+##### 按关系排序 ​
+
 您还可以按关系的属性进行排序。例如，以下查询按作者的电子邮件地址对所有帖子进行排序：
+
 ```ts
 const posts = await prisma.post.findMany({
   orderBy: {
     author: {
-      email: 'asc',
+      email: "asc",
     },
   },
-})
+});
 ```
 
-##### 按关系聚合值排序​
+##### 按关系聚合值排序 ​
+
 您可以按相关记录的计数进行排序。例如，以下查询按相关帖子的数量对用户进行排序：
+
 ```ts
 const getActiveUsers = await prisma.user.findMany({
   take: 10,
   orderBy: {
     posts: {
-      _count: 'desc',
+      _count: "desc",
     },
   },
-})
+});
 ```
 
-
 ##### 按相关性排序（PostgreSQL 和 MySQL）​
+
 在 PostgreSQL 3.5.0+ 和 MySQL 3.8.0+ 中，您可以使用 `_relevance` 关键字按与查询的相关性对记录进行排序。这使用全文搜索功能的相关性排名功能。
 [PostgreSQL 文档](https://www.postgresql.org/docs/12/textsearch-controls.html) 和 [MySQL 文档](https://dev.mysql.com/doc/refman/8.0/en/fulltext-search.html) 中进一步解释了此功能。
 使用 `fullTextSearch` 预览功能启用按相关性排序：
+
 ```prisma
 generator client {
   provider        = "prisma-client-js"
   previewFeatures = ["fullTextSearch"]
 }
 ```
+
 按相关性排序可以单独使用或与搜索过滤器一起使用：`_relevance` 用于对列表进行排序，而搜索则过滤无序列表。
-例如，以下查询使用 `_relevance` 按bio字段中的术语developer进行过滤，然后按相关性升序对结果进行排序：
+例如，以下查询使用 `_relevance` 按 bio 字段中的术语 developer 进行过滤，然后按相关性升序对结果进行排序：
+
 ```ts
 const getUsersByRelevance = await prisma.user.findMany({
   take: 10,
   orderBy: {
     _relevance: {
-      fields: ['bio'],
-      search: 'developer',
-      sort: 'asc',
+      fields: ["bio"],
+      search: "developer",
+      sort: "asc",
     },
   },
-})
+});
 ```
 
-##### 首先或最后以空记录排序​
+##### 首先或最后以空记录排序 ​
+
 您可以对结果进行排序，以便具有空字段的记录出现在最前面或最后。
 
 - 此功能**不适用于 MongoDB**。
 - 您只能按**可选标量字段**上的空值进行排序。如果您尝试按必填字段或关系字段上的空值进行排序，Prisma 客户端会抛出 P2009 错误。
 
 如果 name 是可选字段，则以下查询使用 `last` 按名称对用户进行排序，末尾为空记录：
+
 ```ts
 const users = await prisma.user.findMany({
   orderBy: {
-    updatedAt: { sort: 'asc', nulls: 'last' },
+    updatedAt: { sort: "asc", nulls: "last" },
   },
-})
+});
 ```
 
 如果您希望具有空值的记录出现在返回数组的开头，请首先使用：
+
 ```ts
 const users = await prisma.user.findMany({
   orderBy: {
-    updatedAt: { sort: 'asc', nulls: 'first' },
+    updatedAt: { sort: "asc", nulls: "first" },
   },
-})
+});
 ```
+
 请注意，`first` 也是默认值，因此如果省略 `null` 选项，则 `null` 值将首先出现在返回的数组中。
 
+##### 排序常见问题解答 ​
 
-##### 排序常见问题解答​
 - [我可以执行不区分大小写的排序吗？​](https://github.com/prisma/prisma-client-js/issues/841)
 
-
 ### Pagination
+
 Prisma Client 支持偏移分页和基于光标的分页。
 
 #### 偏移分页
+
 偏移分页使用 `skip` 和 `take` 来跳过一定数量的结果并选择有限的范围。
 以下查询跳过前 3 个 Post 记录并返回记录 4 - 7：
+
 ```ts
 const results = await prisma.post.findMany({
   skip: 3,
   take: 4,
-})
+});
 ```
 
-##### 偏移分页的优点​
+##### 偏移分页的优点 ​
+
 - 您可以立即跳转到任何页面。
 - 您可以按任何排序顺序对同一结果集进行分页。
 
-##### 偏移分页的缺点​
+##### 偏移分页的缺点 ​
+
 - 偏移分页不会在数据库级别扩展。
 
-##### 偏移分页的用例​
+##### 偏移分页的用例 ​
+
 - 小结果集的浅分页。
 
-##### 示例：过滤和偏移分页​
+##### 示例：过滤和偏移分页 ​
+
 以下查询返回电子邮件字段包含 prisma.io 的所有记录。该查询跳过前 40 条记录并返回记录 41 - 50。
+
 ```ts
 const results = await prisma.post.findMany({
   skip: 40,
   take: 10,
   where: {
     email: {
-      contains: 'prisma.io',
+      contains: "prisma.io",
     },
   },
-})
+});
 ```
 
-##### 示例：排序和偏移分页​
+##### 示例：排序和偏移分页 ​
+
 以下查询返回电子邮件字段包含 Prisma 的所有记录，并按标题字段对结果进行排序。该查询跳过前 200 条记录并返回记录 201 - 220。
+
 ```ts
 const results = await prisma.post.findMany({
   skip: 200,
   take: 20,
   where: {
     email: {
-      contains: 'Prisma',
+      contains: "Prisma",
     },
   },
   orderBy: {
-    title: 'desc',
+    title: "desc",
   },
-})
+});
 ```
 
-
 #### 基于游标的分页
+
 基于游标的分页使用游标和 `take` 在给定游标之前或之后返回一组有限的结果。游标为您在结果集中的位置添加书签，并且必须是唯一的连续列 - 例如 ID 或时间戳。
 
 以下示例返回前 4 条包含单词“Prisma”的 Post 记录，并将最后一条记录的 ID 保存为 myCursor：
-***注意***：由于这是第一个查询，因此没有要传入的游标。
+**_注意_**：由于这是第一个查询，因此没有要传入的游标。
+
 ```ts
 const firstQueryResults = await prisma.post.findMany({
   take: 4,
   where: {
     title: {
-      contains: 'Prisma' /* Optional filter */,
+      contains: "Prisma" /* Optional filter */,
     },
   },
   orderBy: {
-    id: 'asc',
+    id: "asc",
   },
-})
+});
 
 // Bookmark your location in the result set - in this
 // case, the ID of the last post in the list of 4.
 
-const lastPostInResults = firstQueryResults[3] // Remember: zero-based index! :)
-const myCursor = lastPostInResults.id // Example: 29
+const lastPostInResults = firstQueryResults[3]; // Remember: zero-based index! :)
+const myCursor = lastPostInResults.id; // Example: 29
 ```
 
 第二个查询返回在提供的光标之后包含单词“Prisma”的前 4 个 Post 记录（换句话说 - 大于 29 的 ID）：
+
 ```ts
 const secondQueryResults = await prisma.post.findMany({
   take: 4,
@@ -3217,48 +3326,57 @@ const secondQueryResults = await prisma.post.findMany({
   },
   where: {
     title: {
-      contains: 'Prisma' /* Optional filter */,
+      contains: "Prisma" /* Optional filter */,
     },
   },
   orderBy: {
-    id: 'asc',
+    id: "asc",
   },
-})
+});
 
-const lastPostInResults = secondQueryResults[3] // Remember: zero-based index! :)
-const myCursor = lastPostInResults.id // Example: 52
+const lastPostInResults = secondQueryResults[3]; // Remember: zero-based index! :)
+const myCursor = lastPostInResults.id; // Example: 52
 ```
+
 ![](./assets/cursor-2.png)
 
 ##### 常见问题
 
 ###### 我是否总是必须 skip：1？​
+
 如果您不跳过：1，您的结果集将包括您之前的光标。第一个查询返回 4 个结果，游标为 29,
-如果没有skip:1，第二个查询将在光标之后（包括）返回4个结果,
+如果没有 skip:1，第二个查询将在光标之后（包括）返回 4 个结果,
 如果跳过：1，则不包括光标,
 您可以选择跳过：1 或不跳过，具体取决于您想要的分页行为。
 
 ###### 我能猜出光标的值吗？​
+
 如果您猜测下一个光标的值，您将分页到结果集中的未知位置。尽管 ID 是连续的，但您无法预测增量速率（2、20、32 比 1、2、3 更有可能，特别是在筛选的结果集中）。
 
 ###### 基于游标的分页是否使用底层数据库中游标的概念？​
+
 不，游标分页不使用底层数据库中的游标（例如 PostgreSQL）。
 
 ###### 如果光标值不存在会发生什么？​
+
 使用不存在的游标将返回 null。 Prisma 客户端不会尝试查找相邻值。
 
 ##### 基于游标的分页的优点
-基于光标的分页比例。底层SQL不使用OFFSET，而是查询所有ID大于cursor值的Post记录。
+
+基于光标的分页比例。底层 SQL 不使用 OFFSET，而是查询所有 ID 大于 cursor 值的 Post 记录。
 
 ##### 基于游标的分页的缺点
+
 您必须按光标排序，光标必须是唯一的连续列。
 仅使用光标无法跳转到特定页面。例如，如果不首先请求页面 1 - 399，则无法准确预测哪个光标表示第 400 页（页面大小 20）的开头。
 
 ##### 基于游标的分页的用例
+
 - 无限滚动 - 例如，按日期/时间降序对博客文章进行排序，并一次请求 10 篇博客文章。
 - 批量分页整个结果集 - 例如，作为长期运行的数据导出的一部分。
 
 ##### 示例：过滤和基于游标的分页
+
 ```ts
 const secondQuery = await prisma.post.findMany({
   take: 4,
@@ -3267,23 +3385,25 @@ const secondQuery = await prisma.post.findMany({
   },
   where: {
     title: {
-      contains: 'Prisma' /* Optional filter */,
+      contains: "Prisma" /* Optional filter */,
     },
   },
   orderBy: {
-    id: 'asc',
+    id: "asc",
   },
-})
+});
 ```
 
 ##### 排序和基于游标的分页
+
 基于游标的分页要求您按顺序、唯一的列（例如 ID 或时间戳）进行排序。该值（称为游标）为您在结果集中的位置添加书签，并允许您请求下一组。
 
-
 ##### 示例：使用基于游标的分页向后分页
+
 要向后翻页，请将 take 设置为负值。以下查询返回 4 条 id 小于 200 的 Post 记录（不包括游标）：
+
 ```ts
-const myOldCursor = 200
+const myOldCursor = 200;
 
 const firstQueryResults = await prisma.post.findMany({
   take: -4,
@@ -3293,32 +3413,36 @@ const firstQueryResults = await prisma.post.findMany({
   },
   where: {
     title: {
-      contains: 'Prisma' /* Optional filter */,
+      contains: "Prisma" /* Optional filter */,
     },
   },
   orderBy: {
-    id: 'asc',
+    id: "asc",
   },
-})
+});
 ```
 
 ### Aggregation,grouping,and summarizing
+
 Prisma 客户端允许您对记录进行计数、聚合数字字段并选择不同的字段值。
 
 #### Aggregation(聚合)
+
 Prisma Client 允许您聚合模型的数字字段（例如 `Int` 和 `Float`）。
 以下查询返回所有用户的平均年龄：
+
 ```ts
 const aggregations = await prisma.user.aggregate({
   _avg: {
     age: true,
   },
-})
+});
 
-console.log('Average age:' + aggregations._avg.age)
+console.log("Average age:" + aggregations._avg.age);
 ```
 
 您可以将聚合与过滤和排序结合起来。例如，以下查询返回用户的平均年龄：
+
 ```ts
 const aggregations = await prisma.user.aggregate({
   _avg: {
@@ -3326,20 +3450,22 @@ const aggregations = await prisma.user.aggregate({
   },
   where: {
     email: {
-      contains: 'prisma.io',
+      contains: "prisma.io",
     },
   },
   orderBy: {
-    age: 'asc',
+    age: "asc",
   },
   take: 10,
-})
+});
 
-console.log('Average age:' + aggregations._avg.age)
+console.log("Average age:" + aggregations._avg.age);
 ```
 
-##### 聚合值可以为空​
+##### 聚合值可以为空 ​
+
 可为空字段的聚合可以返回数字或 `null`。这不包括 `count`，如果未找到记录，则始终返回 0。
+
 ```ts
 const aggregations = await prisma.user.aggregate({
   _avg: {
@@ -3348,7 +3474,7 @@ const aggregations = await prisma.user.aggregate({
   _count: {
     age: true,
   },
-})
+});
 
 // {
 //   _avg: {
@@ -3359,21 +3485,25 @@ const aggregations = await prisma.user.aggregate({
 //   }
 // }
 ```
-在以下任一情况下，查询返回 { _avg: { Age: null } }：
+
+在以下任一情况下，查询返回 { \_avg: { Age: null } }：
+
 - 没有用户
 - 每个用户的年龄字段值为空
-这使您可以区分真实聚合值（可能为零）和无数据。
+  这使您可以区分真实聚合值（可能为零）和无数据。
 
 #### Group by(分组)
+
 Prisma Client 的 `groupBy()` 允许您按一个或多个字段值（例如国家或国家和城市）对记录进行分组，并对每个组执行聚合，例如查找居住在特定城市的人们的平均年龄。
 以下示例按国家/地区字段对所有用户进行分组，并返回每个国家/地区的个人资料查看总数：
+
 ```ts
 const groupUsers = await prisma.user.groupBy({
-  by: ['country'],
+  by: ["country"],
   _sum: {
     profileViews: true,
   },
-})
+});
 
 // [
 //   { country: 'Germany', _sum: { profileViews: 126 } },
@@ -3382,42 +3512,47 @@ const groupUsers = await prisma.user.groupBy({
 ```
 
 如果 `by` 选项中有单个元素，则可以使用以下简写语法来表达查询：
+
 ```ts
 const groupUsers = await prisma.user.groupBy({
-  by: 'country',
-})
+  by: "country",
+});
 ```
 
-##### groupBy() 和过滤​
+##### groupBy() 和过滤 ​
+
 `groupBy()` 支持两个级别的过滤：`where` 和`having`。
 
+###### 使用 where 过滤记录 ​
 
-###### 使用 where 过滤记录​
 分组前使用`where`过滤所有记录。
 以下示例按国家/地区和汇总个人资料视图对用户进行分组，但仅包括电子邮件地址包含 prisma.io 的用户：
+
 ```ts
 const groupUsers = await prisma.user.groupBy({
-  by: ['country'],
+  by: ["country"],
   where: {
     email: {
-      contains: 'prisma.io',
+      contains: "prisma.io",
     },
   },
   _sum: {
     profileViews: true,
   },
-})
+});
 ```
 
 ###### 使用 having 过滤组
+
 `having` 必须按**聚合值**（例如字段的总和或平均值）而不是单个记录来过滤整个组
 例如，仅返回平均 profileViews 大于 100 的组：
+
 ```ts
 const groupUsers = await prisma.user.groupBy({
-  by: ['country'],
+  by: ["country"],
   where: {
     email: {
-      contains: 'prisma.io',
+      contains: "prisma.io",
     },
   },
   _sum: {
@@ -3430,19 +3565,21 @@ const groupUsers = await prisma.user.groupBy({
       },
     },
   },
-})
+});
 ```
 
 ###### 使用 having 的用例
+
 `having`的主要用例是过滤聚合。
 我们建议您在分组之前使用 `where` 来尽可能减小数据集的大小，因为这样做可以减少数据库必须返回的记录数，并且可以利用索引。
 例如，以下查询对非瑞典或加纳的所有用户进行分组：
+
 ```ts
 const fd = await prisma.user.groupBy({
-  by: ['country'],
+  by: ["country"],
   where: {
     country: {
-      notIn: ['Sweden', 'Ghana'],
+      notIn: ["Sweden", "Ghana"],
     },
   },
   _sum: {
@@ -3455,16 +3592,17 @@ const fd = await prisma.user.groupBy({
       },
     },
   },
-})
+});
 ```
 
 以下查询在技术上实现了相同的结果，但在分组后排除了来自加纳的用户。这不会带来任何好处，也不推荐这样做。
+
 ```ts
 const groupUsers = await prisma.user.groupBy({
-  by: ['country'],
+  by: ["country"],
   where: {
     country: {
-      not: 'Sweden',
+      not: "Sweden",
     },
   },
   _sum: {
@@ -3472,7 +3610,7 @@ const groupUsers = await prisma.user.groupBy({
   },
   having: {
     country: {
-      not: 'Ghana',
+      not: "Ghana",
     },
     profileViews: {
       _min: {
@@ -3480,72 +3618,82 @@ const groupUsers = await prisma.user.groupBy({
       },
     },
   },
-})
+});
 ```
 
+##### groupBy() 和排序 ​
 
-##### groupBy() 和排序​
 当组合 `groupBy()` 和 `orderBy` 时，以下约束适用：
+
 - 您可以 `orderBy`,`by` 中存在的字段
 - 您可以`orderBy`聚合
 - 如果您将`skip`和`take`与`groupBy()`一起使用，则还必须在查询中包含`orderBy`
 
-##### 按聚合组排序​
+##### 按聚合组排序 ​
+
 您可以按聚合组订购。
 以下示例按每个城市组中的用户数量对该组进行排序（最大的组在前）：
+
 ```ts
 const groupBy = await prisma.user.groupBy({
-  by: ['city'],
+  by: ["city"],
   _count: {
     city: true,
   },
   orderBy: {
     _count: {
-      city: 'desc',
+      city: "desc",
     },
   },
-})
+});
 ```
 
-##### 按字段排序​
+##### 按字段排序 ​
+
 以下查询按国家/地区对组进行排序，跳过前两组，并返回第三组和第四组：
+
 ```ts
 const groupBy = await prisma.user.groupBy({
-  by: ['country'],
+  by: ["country"],
   _sum: {
     profileViews: true,
   },
   orderBy: {
-    country: 'desc',
+    country: "desc",
   },
   skip: 2,
   take: 2,
-})
-
+});
 ```
 
-##### groupBy() 常见问题解答​
+##### groupBy() 常见问题解答 ​
 
 ###### 我可以将 `select` 与 `groupBy()` 一起使用吗？​
+
 您不能将 `select` 与` groupBy()` 一起使用。但是，`by` 中包含的所有字段都会自动返回。
 
 ###### 在 `groupBy()` 中使用 `where` 和 `having` 有什么区别？​
+
 `where` 在分组之前过滤所有记录，`having` 过滤整个组并支持对聚合字段值进行过滤，例如该组中特定字段的平均值或总和。
 
 ###### `groupBy()` 和 `distinct` 之间有什么区别？​
-`distinct` 和 `groupBy()` 都按一个或多个唯一字段值对记录进行分组。 `groupBy()` 允许您聚合每个组内的数据 - 例如，返回来自丹麦的帖子的平均浏览量 - 而 `distinct` 则不能。
 
+`distinct` 和 `groupBy()` 都按一个或多个唯一字段值对记录进行分组。 `groupBy()` 允许您聚合每个组内的数据 - 例如，返回来自丹麦的帖子的平均浏览量 - 而 `distinct` 则不能。
 
 #### Count(计数)
 
-##### 计数记录​
+##### 计数记录 ​
+
 使用 `count()` 来统计记录或非空字段值的数量。以下示例查询对所有用户进行计数：
+
 ```ts
-const userCount = await prisma.user.count()
+const userCount = await prisma.user.count();
 ```
 
-##### 计数关系​
+##### 计数关系 ​
+
 要返回关系计数（例如，用户的帖子计数），请使用 `_count` 参数和嵌套选择，如下所示：
+
 ```ts
 const usersWithCount = await prisma.user.findMany({
   include: {
@@ -3553,17 +3701,20 @@ const usersWithCount = await prisma.user.findMany({
       select: { posts: true },
     },
   },
-})
+});
 ```
 
 `_count`参数：
+
 - 可以在顶级`include`或`select`内部使用
 - 可与任何返回记录的查询一起使用（包括`delete`、`update`和 `findFirst`）
 - 可以返回多个关系计数
 - 可以过滤关系计数
 
 ###### 使用 `include` 返回关系计数
+
 以下查询在结果中包含每个用户的帖子计数：
+
 ```ts
 const usersWithCount = await prisma.user.findMany({
   include: {
@@ -3571,11 +3722,13 @@ const usersWithCount = await prisma.user.findMany({
       select: { posts: true },
     },
   },
-})
+});
 ```
 
-###### 使用 `select` 返回关系计数​
+###### 使用 `select` 返回关系计数 ​
+
 以下查询使用 `select` 返回每个用户的帖子计数，不返回其他字段：
+
 ```ts
 const usersWithCount = await prisma.user.findMany({
   select: {
@@ -3583,11 +3736,13 @@ const usersWithCount = await prisma.user.findMany({
       select: { posts: true },
     },
   },
-})
+});
 ```
 
-###### 返回多个关系计数​
+###### 返回多个关系计数 ​
+
 以下查询返回每个用户的帖子和食谱的计数，不返回其他字段：
+
 ```ts
 const usersWithCount = await prisma.user.findMany({
   select: {
@@ -3598,25 +3753,29 @@ const usersWithCount = await prisma.user.findMany({
       },
     },
   },
-})
+});
 ```
 
-###### 过滤关系计数​
+###### 过滤关系计数 ​
+
 使用 `where` 来过滤 `_count` 输出类型返回的字段。您可以对*标量字段*、*关系字段*和*复合类型字段*执行此操作。
 例如，以下查询返回标题为“Hello!”的所有用户帖子：
+
 ```ts
 // Count all user posts with the title "Hello!"
 await prisma.user.findMany({
   select: {
     _count: {
       select: {
-        posts: { where: { title: 'Hello!' } },
+        posts: { where: { title: "Hello!" } },
       },
     },
   },
-})
+});
 ```
+
 以下查询查找包含来自名为“Alice”的作者的评论的所有用户帖子：
+
 ```ts
 // Count all user posts that have comments
 // whose author is named "Alice"
@@ -3625,17 +3784,19 @@ await prisma.user.findMany({
     _count: {
       select: {
         posts: {
-          where: { comments: { some: { author: { is: { name: 'Alice' } } } } },
+          where: { comments: { some: { author: { is: { name: "Alice" } } } } },
         },
       },
     },
   },
-})
+});
 ```
 
-###### 计算非空字段值​
+###### 计算非空字段值 ​
+
 您可以对所有记录以及非空字段值的所有实例进行计数。
 以下查询返回计数：
+
 - 所有用户记录 (`_all`)
 - 所有非空名称值（不是不同的值，只是不为空的值）
 
@@ -3645,11 +3806,13 @@ const userCount = await prisma.user.count({
     _all: true, // Count all records
     name: true, // Count all non-null field values
   },
-})
+});
 ```
 
-###### 过滤计数​
+###### 过滤计数 ​
+
 `count` 支持过滤。以下示例查询对拥有超过 100 个个人资料视图的所有用户进行计数：
+
 ```ts
 const userCount = await prisma.user.count({
   where: {
@@ -3657,43 +3820,654 @@ const userCount = await prisma.user.count({
       gte: 100,
     },
   },
-})
+});
 ```
 
 以下示例查询对特定用户的帖子进行计数：
+
 ```ts
 const postCount = await prisma.post.count({
   where: {
     authorId: 29,
   },
-})
+});
 ```
 
 ##### Select distinct
+
 Prisma 客户端允许您使用 `distinct` 过滤从 Prisma 查询响应到 `findMany` 查询的重复行。 `distinct` 通常与 `select` 结合使用，以识别表行中某些唯一的值组合。
 以下示例返回具有不同名称字段值的所有用户记录的所有字段：
+
 ```ts
 const result = await prisma.user.findMany({
   where: {},
-  distinct: ['name'],
-})
+  distinct: ["name"],
+});
 ```
 
 以下示例返回不同的角色字段值（例如 ADMIN 和 USER）：
+
 ```ts
 const distinctRoles = await prisma.user.findMany({
-  distinct: ['role'],
+  distinct: ["role"],
   select: {
     role: true,
   },
-})
+});
 ```
 
 ###### [distinct under the hood](https://www.prisma.io/docs/orm/prisma-client/queries/aggregation-grouping-summarizing#distinct-under-the-hood)
 
 ### Transactions and batch queries
 
+数据库事务是指保证整体成功或失败的一系列读/写操作。
+开发人员通过将操作包装在事务中来利用数据库提供的安全保证。
+
+Prisma Client 支持六种不同的交易处理方式，适用于三种不同的场景：
+|Scenario|Available techniques|
+|--|--|
+|Dependent writes|Nested writes|
+|Independent writes|<li> `$transaction([])` API </li> <li> Batch operations</li>|
+|Read, modify, write|<li>Idempotent operations</li> <li>Optimistic concurrency control</li> <li>Interactive transactions</li>|
+
+您选择的技术取决于您的特定用例。
+
+#### 关于 Prisma 客户端中的交易
+
+Prisma 客户端提供以下使用事务的选项：
+
+- 嵌套写入：使用 Prisma 客户端 API 处理同一事务中一条或多条相关记录的多个操作。
+- Batch/bulk 事务：使用 updateMany、deleteMany 和 createMany 批量处理一个或多个操作。
+- THE `$transaction` API in Prisma Client：
+  - 顺序操作：使用 `$transaction<R>(queries: PrismaPromise<R>[]): Promise<R[]>` 传递要在事务内顺序执行的 Prisma Client 查询数组。
+  - 交互式事务：传递一个函数，该函数可以包含用户代码，包括 Prisma 客户端查询、非 Prisma 代码和要在事务中执行的其他控制流，使用 `$transaction<R>(fn: (prisma: PrismaClient) => R, options ?: object): R`
+
+#### 嵌套写入
+
+嵌套写入允许您执行单个 Prisma 客户端 API 调用，其中包含涉及多个相关记录的多个操作。
+例如，与帖子一起创建用户或与发票一起更新订单。 Prisma 客户端确保所有操作整体成功或失败。
+
+以下示例演示了使用 create 进行嵌套写入：
+
+```ts
+// Create a new user with two posts in a
+// single transaction
+const newUser: User = await prisma.user.create({
+  data: {
+    email: "alice@prisma.io",
+    posts: {
+      create: [
+        { title: "Join the Prisma Discord at https://pris.ly/discord" },
+        { title: "Follow @prisma on Twitter" },
+      ],
+    },
+  },
+});
+```
+
+以下示例演示了带更新的嵌套写入：
+
+```ts
+// Change the author of a post in a single transaction
+const updatedPost: Post = await prisma.post.update({
+  where: { id: 42 },
+  data: {
+    author: {
+      connect: { email: "alice@prisma.io" },
+    },
+  },
+});
+```
+
+#### [Batch/bulk operations](https://www.prisma.io/docs/orm/prisma-client/queries/transactions#bulk-operations)
+
+- deleteMany()
+- updateMany()
+- createMany()
+- createManyAndReturn()
+
+#### The `$transaction` API
+
+`$transaction` API 可以通过两种方式使用：
+
+- 顺序操作：传递要在事务内顺序执行的 Prisma 客户端查询数组。
+- 交互式交易：传递一个可以包含用户代码的函数，包括 Prisma 客户端查询、非 Prisma 代码和要在交易中执行的其他控制流。
+
+##### 顺序 Prisma 客户端操作
+
+以下查询返回与所提供的过滤器匹配的所有帖子以及所有帖子的计数：
+
+```ts
+const [posts, totalPosts] = await prisma.$transaction([
+  prisma.post.findMany({ where: { title: { contains: "prisma" } } }),
+  prisma.post.count(),
+]);
+```
+
+您还可以在 `$transaction` 中使用原始查询：
+
+```ts
+import { selectUserTitles, updateUserName } from "@prisma/client/sql";
+
+const [userList, updateUser] = await prisma.$transaction([
+  prisma.$queryRawTyped(selectUserTitles()),
+  prisma.$queryRawTyped(updateUserName(2)),
+]);
+```
+
+操作本身不是在执行时立即等待每个操作的结果，而是首先将其存储在变量中，然后使用名为 $transaction 的方法将其提交到数据库。 Prisma 客户端将确保所有三个创建操作都成功或都不成功。
+
+从版本 4.4.0 开始，顺序操作事务 API 有第二个参数。您可以在此参数中使用以下可选配置选项：
+
+- isolationLevel：设置事务隔离级别。默认情况下，该值设置为数据库中当前配置的值。
+
+```ts
+await prisma.$transaction(
+  [
+    prisma.resource.deleteMany({ where: { name: "name" } }),
+    prisma.resource.createMany({ data }),
+  ],
+  {
+    isolationLevel: Prisma.TransactionIsolationLevel.Serializable, // optional, default defined by database configuration
+  }
+);
+```
+
+##### 互动交易
+
+有时您需要更多地控制事务中执行的查询。交互式交易旨在为您提供逃生舱口。
+
+要使用交互式事务，您可以将异步函数传递到 $transaction 中。
+传递到该异步函数的第一个参数是 Prisma Client 的实例。下面，我们将该实例称为 tx。在此 tx 实例上调用的任何 Prisma 客户端调用都会封装到事务中。
+**warning:** _谨慎使用交互式交易。长时间保持事务打开会损害数据库性能，甚至可能导致死锁。尽量避免在事务函数内执行网络请求和执行缓慢的查询。我们建议您尽快进出！_
+
+要捕获异常，您可以将 `$transaction` 包装在 `try-catch` 块中：
+
+```ts
+try {
+  await prisma.$transaction(async (tx) => {
+    // Code running in a transaction...
+  });
+} catch (err) {
+  // Handle the rollback...
+}
+```
+
+###### 交易选项
+
+交易 API 有第二个参数。对于交互式事务，您可以在此参数中使用以下可选配置选项：-
+
+- `maxWait`：Prisma 客户端等待从数据库获取事务的最长时间。默认值为 2 秒。
+- `timeout`：交互式事务在被取消和回滚之前可以运行的最长时间。默认值为 5 秒。
+- `isolationLevel`：设置事务隔离级别。默认情况下，该值设置为数据库中当前配置的值。
+
+```ts
+await prisma.$transaction(
+  async (tx) => {
+    // Code running in a transaction...
+  },
+  {
+    maxWait: 5000, // default: 2000
+    timeout: 10000, // default: 5000
+    isolationLevel: Prisma.TransactionIsolationLevel.Serializable, // optional, default defined by database configuration
+  }
+);
+```
+
+您还可以在构造函数级别全局设置这些：
+
+```ts
+const prisma = new PrismaClient({
+  transactionOptions: {
+    isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+    maxWait: 5000, // default: 2000
+    timeout: 10000, // default: 5000
+  },
+});
+```
+
+##### 事务隔离级别 ​
+
+您可以为事务设置事务隔离级别。
+
+###### 设置隔离级别 ​
+
+要设置事务隔离级别，请使用 API 的第二个参数中的 `isolationLevel` 选项。
+
+- 对于顺序操作：
+
+```ts
+await prisma.$transaction(
+  [
+    // Prisma Client operations running in a transaction...
+  ],
+  {
+    isolationLevel: Prisma.TransactionIsolationLevel.Serializable, // optional, default defined by database configuration
+  }
+);
+```
+
+- 对于交互式交易：
+
+```ts
+await prisma.$transaction(
+  async (prisma) => {
+    // Code running in a transaction...
+  },
+  {
+    isolationLevel: Prisma.TransactionIsolationLevel.Serializable, // optional, default defined by database configuration
+    maxWait: 5000, // default: 2000
+    timeout: 10000, // default: 5000
+  }
+);
+```
+
+###### 支持的隔离级别 ​
+
+Prisma Client 支持以下隔离级别（如果底层数据库中可用）：
+
+- ReadUncommitted
+- ReadCommitted
+- RepeatableRead
+- Snapshot
+- Serializable
+
+默认情况下，Prisma 客户端将隔离级别设置为数据库中当前配置的值。
+
+每个数据库默认配置的隔离级别如下：
+|Database|Default|
+|--|--|
+|PostgreSQL|ReadCommitted|
+|MySQL|RepeatableRead|
+|SQL Server|ReadCommitted|
+|CockroachDB|Serializable|
+|SQLite|Serializable|
+
+##### 交易时间问题 ​ ​
+
+INFO：
+
+- 本节中的解决方案不适用于 MongoDB，因为 MongoDB 不支持隔离级别。
+- 本节讨论的时序问题不适用于 CockroachDB 和 SQLite，因为这些数据库仅支持最高的 Serialized 隔离级别。
+
+当两个或多个事务在某些隔离级别下并发运行时，计时问题可能会导致写入冲突或死锁，例如违反唯一约束。例如，考虑以下事件序列，其中事务 A 和事务 B 都尝试执行 `deleteMany` 和 `createMany` 操作：
+
+1. 事务 B：createMany 操作创建一组新的行。
+2. 事务 B：应用程序提交事务 B。
+3. 事务 A：createMany 操作。
+4. 事务 A：应用程序提交事务 A。新行与事务 B 在步骤 2 添加的行冲突。
+
+这种冲突可能发生在隔离级别 ReadCommited 上，这是 PostgreSQL 和 Microsoft SQL Server 中的默认隔离级别。为了避免这个问题，可以设置更高的隔离级别（RepeatableRead 或 Serialized）。您可以设置事务的隔离级别。这会覆盖该事务的数据库隔离级别。
+
+为了避免事务写入冲突和事务死锁：
+
+1. 在您的事务中，使用 Prisma.TransactionIsolationLevel.Serialized 的隔离级别参数。
+   这可确保您的应用程序提交多个并发或并行事务，就像它们串行运行一样。当事务由于写入冲突或死锁而失败时，Prisma 客户端会返回 P2034 错误。
+2. 在您的应用程序代码中，在事务周围添加重试以处理任何 P2034 错误，如本示例所示：
+
+```ts
+import { Prisma, PrismaClient } from "@prisma/client";
+
+const prisma = new PrismaClient();
+async function main() {
+  const MAX_RETRIES = 5;
+  let retries = 0;
+
+  let result;
+  while (retries < MAX_RETRIES) {
+    try {
+      result = await prisma.$transaction(
+        [
+          prisma.user.deleteMany({
+            where: {
+              /** args */
+            },
+          }),
+          prisma.post.createMany({
+            data: {
+              /** args */
+            },
+          }),
+        ],
+        {
+          isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+        }
+      );
+      break;
+    } catch (error) {
+      if (error.code === "P2034") {
+        retries++;
+        continue;
+      }
+      throw error;
+    }
+  }
+}
+```
+
+##### 在 `Promise.all()` 中使用 `$transaction​`
+
+如果您将 `$transaction` 包装在对 `Promise.all()` 的调用中，则事务中的查询将**串行执行**（即一个接一个）：
+
+```ts
+await prisma.$transaction(async (prisma) => {
+  await Promise.all([
+    prisma.user.findMany(),
+    prisma.user.findMany(),
+    prisma.user.findMany(),
+    prisma.user.findMany(),
+    prisma.user.findMany(),
+    prisma.user.findMany(),
+    prisma.user.findMany(),
+    prisma.user.findMany(),
+    prisma.user.findMany(),
+    prisma.user.findMany(),
+  ]);
+});
+```
+
+这可能是违反直觉的，因为 Promise.all() 通常会并行化传递给它的调用。
+这种行为的原因是：
+
+- 一个事务意味着其中的所有查询都必须在同一连接上运行。
+- 一个数据库连接一次只能执行一个查询。
+- 由于一个查询在执行工作时会阻塞连接，因此将事务放入 Promise.all 中实际上意味着查询应该一个接一个地运行。
+
+#### 依赖写入 ​
+
+在以下情况下，写入被视为相互依赖：
+
+- 操作取决于前面操作的结果（例如，数据库生成 ID）
+
+最常见的场景是创建记录并使用生成的 ID 创建或更新相关记录。示例包括：
+
+- 创建一个用户和两个相关的博客文章（一对多关系） - 创建博客文章之前必须知道作者 ID
+- 创建团队并分配成员（多对多关系） - 在分配成员之前必须知道团队 ID
+
+相关写入必须同时成功，以保持数据一致性并防止意外行为，例如没有作者的博客文章或没有成员的团队。
+
+##### 嵌套写入 ​
+
+Prisma Client 针对依赖写入的解决方案是嵌套写入功能，该功能由 `create` 和 `update` 来支持。
+以下嵌套写入创建一个用户和两篇博客文章：
+
+```ts
+const nestedWrite = await prisma.user.create({
+  data: {
+    email: "imani@prisma.io",
+    posts: {
+      create: [
+        { title: "My first day at Prisma" },
+        { title: "How to configure a unique constraint in PostgreSQL" },
+      ],
+    },
+  },
+});
+```
+
+如果任何操作失败，Prisma 客户端将回滚整个事务。 `client.user.deleteMany` 和 `client.user.updateMany` 等顶级批量操作当前不支持嵌套写入。
+
+##### 何时使用嵌套写入 ​
+
+如果出现以下情况，请考虑使用嵌套写入：
+
+- 您想要同时创建两个或多个通过 ID 关联的记录（例如，创建博客文章和用户）
+- 您想要同时更新和创建按 ID 相关的记录（例如，更改用户名并创建新的博客文章）
+
+**TIP:**
+_如果您预先计算 ID，则可以选择嵌套写入或使用 $transaction([]) API。_
+
+##### [场景：注册流程 ​](https://www.prisma.io/docs/orm/prisma-client/queries/transactions#scenario-sign-up-flow)
+
+##### 嵌套写入常见问题解答 ​
+
+- 为什么我不能使用 $transaction([]) API 来解决同样的问题？​
+`$transaction([])` API 不允许您在不同的操作之间传递 ID。在以下示例中，createUserOperation.id 尚不可用：
+
+```ts
+const createUserOperation = prisma.user.create({
+  data: {
+    email: "ebony@prisma.io",
+  },
+});
+
+const createTeamOperation = prisma.team.create({
+  data: {
+    name: "Aurora Adventures",
+    members: {
+      connect: {
+        id: createUserOperation.id, // Not possible, ID not yet available
+      },
+    },
+  },
+});
+
+await prisma.$transaction([createUserOperation, createTeamOperation]);
+```
+
+- 嵌套写入支持嵌套更新，但更新不是依赖写入 - 我应该使用 $transaction([]) API 吗？​
+  正确的说法是，因为您知道团队的 ID，所以您可以在 $transaction([]) 内独立更新团队及其团队成员。以下示例在 $transaction([]) 中执行这两个操作：
+
+```ts
+const updateTeam = prisma.team.update({
+  where: {
+    id: 1,
+  },
+  data: {
+    name: "Aurora Adventures Ltd",
+  },
+});
+
+const updateUsers = prisma.user.updateMany({
+  where: {
+    teams: {
+      some: {
+        id: 1,
+      },
+    },
+    name: {
+      equals: null,
+    },
+  },
+  data: {
+    name: "Unknown User",
+  },
+});
+
+await prisma.$transaction([updateUsers, updateTeam]);
+```
+
+但是，您可以通过嵌套写入获得相同的结果：
+
+```ts
+const updateTeam = await prisma.team.update({
+  where: {
+    id: 1,
+  },
+  data: {
+    name: "Aurora Adventures Ltd", // Update team name
+    members: {
+      updateMany: {
+        // Update team members that do not have a name
+        data: {
+          name: "Unknown User",
+        },
+        where: {
+          name: {
+            equals: null,
+          },
+        },
+      },
+    },
+  },
+});
+```
+
+- 我可以执行多个嵌套写入 - 例如，创建两个新团队并分配用户吗？​
+  是的，但这是场景和技术的组合：
+  - 创建团队和分配用户是依赖写入 - 使用嵌套写入
+  - 同时创建所有团队和用户是独立写入，因为团队/用户组合 #1 和团队/用户组合 #2 是不相关的写入 - 使用 $transaction([]) API
+
+```ts
+// Nested write
+const createOne = prisma.team.create({
+  data: {
+    name: "Aurora Adventures",
+    members: {
+      create: {
+        email: "alice@prisma.io",
+      },
+    },
+  },
+});
+
+// Nested write
+const createTwo = prisma.team.create({
+  data: {
+    name: "Cool Crew",
+    members: {
+      create: {
+        email: "elsa@prisma.io",
+      },
+    },
+  },
+});
+
+// $transaction([]) API
+await prisma.$transaction([createTwo, createOne]);
+```
+
+#### 独立写入 ​
+
+如果写入不依赖于先前操作的结果，则写入被视为独立。以下几组独立写入可以按任何顺序发生：
+
+- 将订单列表的状态字段更新为“已发货”
+- 将电子邮件列表标记为“已读”
+
+根据您的要求，Prisma 客户端有四个选项来处理应该一起成功或一起失败的独立写入。
+
+##### 批量操作 ​
+
+批量写入允许您在单个事务中写入相同类型的多个记录 - 如果任何操作失败，Prisma 客户端将回滚整个事务。 Prisma 客户端目前支持：
+
+- updateMany()
+- deleteMany()
+- createMany()
+- createManyAndReturn()
+
+###### 何时使用批量操作 ​
+
+如果出现以下情况，请考虑将批量操作作为解决方案：
+
+- 您想要更新一批相同类型的记录，例如一批电子邮件
+
+###### [场景：将电子邮件标记为已读 ​](https://www.prisma.io/docs/orm/prisma-client/queries/transactions#scenario-marking-emails-as-read)
+
+###### 我可以在批量操作中使用嵌套写入吗？​
+
+否 - `updateMany` 和 `deleteMany` 目前都不支持嵌套写入。
+例如，您不能删除多个团队及其所有成员（级联删除）：
+
+```ts
+await prisma.team.deleteMany({
+  where: {
+    id: {
+      in: [2, 99, 2, 11],
+    },
+  },
+  data: {
+    members: {}, // Cannot access members here
+  },
+});
+```
+
+###### 我可以通过 $transaction([]) API 使用批量操作吗？​
+
+是的 - 例如，您可以在 $transaction([]) 中包含多个 deleteMany 操作。
+
+##### `$transaction([])` API
+
+`$transaction([])` API 是独立写入的通用解决方案，允许您将多个操作作为单个原子操作运行 - 如果任何操作失败，Prisma 客户端将回滚整个事务。
+
+还值得注意的是，操作是根据它们在事务中放置的顺序执行的。
+
+```ts
+await prisma.$transaction([iRunFirst, iRunSecond, iRunThird]);
+```
+
+随着 Prisma Client 的发展，`$transaction([])` API 的用例将越来越多地被更专业的批量操作（例如 `createMany`）和嵌套写入所取代。
+
+###### 何时使用 `$transaction([])` API​
+
+如果出现以下情况，请考虑使用 $transaction([]) API：
+
+- 您想要更新包含不同类型记录（例如电子邮件和用户）的批次。这些记录不需要以任何方式相关。
+- 您想要批量原始 SQL 查询 ($executeRaw) - 例如，对于 Prisma Client 尚不支持的功能。
+
+###### [场景：隐私立法 ​](https://www.prisma.io/docs/orm/prisma-client/queries/transactions#scenario-privacy-legislation)
+
+###### [场景：预先计算的 ID 和 $transaction([]) API​​](https://www.prisma.io/docs/orm/prisma-client/queries/transactions#scenario-pre-computed-ids-and-the-transaction-api)
+
+#### Read, modify, write
+
+在某些情况下，您可能需要执行自定义逻辑作为原子操作的一部分 - 也称为读取-修改-写入模式
+以下是读取-修改-写入模式的示例：
+
+- 从数据库读取一个值
+- 运行一些逻辑来操纵该值（例如，联系外部 API）
+- 将值写回数据库
+
+所有操作都应该同时成功或失败，而不会对数据库进行不必要的更改，但您不一定需要使用实际的数据库事务。本指南的这一部分介绍了使用 Prisma Client 和读取-修改-写入模式的两种方法：
+
+- 设计幂等 API
+- 乐观并发控制
+
+##### 幂等 API
+
+幂等性是指多次运行具有相同参数的相同逻辑并获得相同结果的能力：无论运行该逻辑一次还是一千次，对数据库的影响都是相同的。例如：
+
+- 非幂等性：在数据库中更新插入（更新或插入）电子邮件地址为“letoya@prisma.io”的用户。用户表不强制使用唯一的电子邮件地址。如果运行逻辑一次（创建一个用户）或十次（创建十个用户），对数据库的影响会有所不同。
+- 幂等性：在数据库中更新插入（更新或插入）电子邮件地址为“letoya@prisma.io”的用户。用户表确实强制执行唯一的电子邮件地址。如果运行逻辑一次（创建一个用户）或十次（使用相同的输入更新现有用户），对数据库的影响是相同的。
+
+幂等性是您可以并且应该尽可能积极地设计到您的应用程序中的东西。
+
+###### 何时设计幂等 API​
+
+您需要能够重试相同的逻辑，而不会在数据库中产生不需要的副作用
+
+###### [场景：升级 Slack 团队 ​](https://www.prisma.io/docs/orm/prisma-client/queries/transactions#scenario-upgrading-a-slack-team)
+
+##### 乐观并发控制
+
+乐观并发控制 (OCC) 是一种用于处理不依赖于 🔒 锁定的单个实体上的并发操作的模型。相反，我们乐观地假设记录在读取和写入之间保持不变，并使用并发令牌（时间戳或版本字段）来检测记录的更改。
+
+如果发生冲突（自您读取记录以来其他人已更改该记录），您将取消事务。根据您的情况，您可以：
+
+- 重试交易（预订另一个电影院座位）
+- 抛出错误（提醒用户他们将要覆盖其他人所做的更改)
+
+###### 何时使用乐观并发控制 ​
+
+- 您预计会有大量并发请求（多人预订电影院座位）
+- 您预计这些并发请求之间的冲突很少
+
+避免在具有大量并发请求的应用程序中出现锁定，可以使应用程序的负载弹性更强，总体上更具可扩展性。虽然锁定本质上并不是坏事，但在高并发环境中锁定可能会导致意想不到的后果 - 即使您锁定单个行，而且只锁定很短的时间。有关更多信息，请参阅：
+
+- [Why ROWLOCK Hints Can Make Queries Slower and Blocking Worse in SQL Server](https://kendralittle.com/2016/02/04/why-rowlock-hints-can-make-queries-slower-and-blocking-worse-in-sql-server/)
+
+###### [何时使用乐观并发控制](https://www.prisma.io/docs/orm/prisma-client/queries/transactions#scenario-reserving-a-seat-at-the-cinema) ​
+
+##### 互动交易 ​
+
+如果您有一个现有的应用程序，那么重构您的应用程序以使用乐观并发控制可能是一项艰巨的任务。交互式交易为此类情况提供了一个有用的逃生口。
+要创建交互式事务，请将异步函数传递到 $transaction 中。
+
+
 ### Full-text search
+Prisma Client 支持 2.30.0 及更高版本的 PostgreSQL 数据库以及 3.8.0 及更高版本的 MySQL 数据库的全文搜索。启用全文搜索后，您可以通过在数据库列中搜索文本来向应用程序添加搜索功能。
+
+
+
 
 ### Custom validation
 
