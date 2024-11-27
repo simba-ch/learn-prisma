@@ -1,3 +1,5 @@
+@import "https://haogeshuohuanihaohaoting.github.io/static/mdCreateMenu.js"
+
 # SCHEMA
 
 Prisma 模式文件（简称：模式文件、Prisma 模式或模式）是 Prisma ORM 设置的主要配置文件。它通常称为 `schema.prisma`，包含以下部分：
@@ -66,8 +68,8 @@ datasource db {
 
 一个 Prisma 架构只能有一个数据源。但是，你可以:
 
-- 在创建 PrismaClient 时以编程方式覆盖数据源 url
-- 如果你使用云托管开发数据库，则为 Prisma Migrate 的影子数据库指定一个不同的 URL
+- [在创建 PrismaClient 时以编程方式覆盖数据源 url](https://www.prisma.io/docs/orm/reference/prisma-client-reference#programmatically-override-a-datasource-url)
+- [如果你使用云托管开发数据库，则为 Prisma Migrate 的影子数据库指定一个不同的 URL](https://www.prisma.io/docs/orm/prisma-migrate/understanding-prisma-migrate/shadow-database#cloud-hosted-shadow-databases-must-be-created-manually)
 
 ### 保护数据库连接
 
@@ -91,7 +93,7 @@ generator client {
 }
 ```
 
-生成器决定在你运行 `prisma generate` 命令时创建哪些资产。主要属性 `provider` 定义创建哪个 `Prisma Client`（特定语言） - 目前，仅提供 `prisma-client-js`。或者，你可以定义遵循我们生成器规范的任何 `npm` 包。此外，你还可以使用 `output` 为生成的资产定义一个自定义输出文件夹。
+生成器决定在你运行 `prisma generate` 命令时创建哪些资产。主要属性 `provider` 定义创建哪个 **_Prisma Client_**（特定语言） - 目前，仅提供 `prisma-client-js`。或者，你可以定义遵循我们生成器规范的任何 _npm 包_。此外，你还可以使用 `output` 为生成的资产定义一个自定义输出文件夹。
 
 ### Prisma Client：prisma-client-js
 
@@ -223,7 +225,7 @@ model Comment {
   - `[]`将字段设为列表
   - `?`将字段设为可选
     **注意不能将 `[]`和`?`组合使用**
-- 可选属性，包括 原生数据库类型属性[##### 不支持的类型]
+- 可选属性，包括 原生数据库类型属性
 
 ##### 本机类型映射
 
@@ -309,7 +311,7 @@ enum Role {
 
 #### 定义复合类型 ​
 
-要定义复合类型，请使用类型块。
+要定义复合类型，请使用 type。
 
 ```prisma
 model Product {
@@ -697,6 +699,8 @@ datasource db {
 **解决方案 ​：** 重命名隐式多对多自关系中的关系字段，请确保保持字段的字母顺序 - 例如，通过添加前缀 a\_ 和 \_b。
 
 ### 索引
+
+Prisma ORM 允许配置数据库索引、唯一约束和主键约束。
 
 #### length 参数
 
@@ -1625,7 +1629,7 @@ const findUser = await prisma.user.findFirst({
 });
 ```
 
-##### 获取过滤后的记录列表 ​
+##### 获取过滤后的记录列表
 
 Prisma Client 支持对记录字段和相关记录字段进行过滤。
 
@@ -2093,7 +2097,7 @@ generator client {
 }
 ```
 
-添加此标志后，您需要再次运行 prismagenerate 以重新生成 Prisma Client。此功能目前在 PostgreSQL、CockroachDB 和 MySQL 上可用。
+添加此标志后，您需要再次运行 `prisma generate` 以重新生成 Prisma Client。此功能目前在 PostgreSQL、CockroachDB 和 MySQL 上可用。
 
 Prisma 客户端支持两种关系加载策略：
 
@@ -2630,7 +2634,7 @@ const result = await prisma.user.update({
 });
 ```
 
-##### 断开所有相关记录 ​
+##### 删除所有相关记录​
 
 删除所有相关的 Post 记录：
 
@@ -2650,7 +2654,7 @@ const result = await prisma.user.update({
 });
 ```
 
-##### 断开所有相关记录 ​
+##### 删除特定相关记录​
 
 通过删除所有未发布的帖子来更新用户：
 
@@ -4496,93 +4500,102 @@ generator client {
 ```cmd
 npx prisma generate
 ```
+
 重新生成客户端后，在模型上创建的任何字符串字段上都将提供新的搜索字段。例如，以下搜索将返回包含单词“cat”的所有帖子。
+
 ```ts
 // All posts that contain the word 'cat'.
 const result = await prisma.posts.findMany({
   where: {
     body: {
-      search: 'cat',
+      search: "cat",
     },
   },
-})
+});
 ```
 
 #### 查询数据库 ​
+
 搜索字段在底层使用数据库的本机查询功能。这意味着可用的确切查询运算符也是特定于数据库的。
 以下示例演示了 PostgreSQL 'and' (&) 和 'or' (|) 运算符的用法：
+
 ```ts
 // All posts that contain the words 'cat' or 'dog'.
 const result = await prisma.posts.findMany({
   where: {
     body: {
-      search: 'cat | dog',
+      search: "cat | dog",
     },
   },
-})
+});
 
 // All drafts that contain the words 'cat' and 'dog'.
 const result = await prisma.posts.findMany({
   where: {
-    status: 'Draft',
+    status: "Draft",
     body: {
-      search: 'cat & dog',
+      search: "cat & dog",
     },
   },
-})
+});
 ```
 
 以下示例演示了 MySQL 'and' (+) 和 'not' (-) 运算符的使用：
+
 ```ts
 // All posts that contain the words 'cat' or 'dog'.
 const result = await prisma.posts.findMany({
   where: {
     body: {
-      search: 'cat dog',
+      search: "cat dog",
     },
   },
-})
+});
 
 // All posts that contain the words 'cat' and not 'dog'.
 const result = await prisma.posts.findMany({
   where: {
     body: {
-      search: '+cat -dog',
+      search: "+cat -dog",
     },
   },
-})
+});
 
 // All drafts that contain the words 'cat' and 'dog'.
 const result = await prisma.posts.findMany({
   where: {
-    status: 'Draft',
+    status: "Draft",
     body: {
-      search: '+cat +dog',
+      search: "+cat +dog",
     },
   },
-})
+});
 ```
 
 #### 按相关性对结果进行排序
+
 除了 Prisma Client 的默认 orderBy 行为之外，全文搜索还添加了按与给定字符串或字符串的相关性进行排序。
 例如，如果您想根据帖子与标题中术语“数据库”的相关性对帖子进行排序，则可以使用以下命令：
+
 ```ts
 const posts = await prisma.post.findMany({
   orderBy: {
     _relevance: {
-      fields: ['title'],
-      search: 'database',
-      sort: 'asc'
+      fields: ["title"],
+      search: "database",
+      sort: "asc",
     },
   },
-})
+});
 ```
 
 #### 添加索引 ​
-对于PostgreSQL，Prisma Client 目前不支持使用索引来加速全文搜索。对此已有一个现有的 [GitHub Issue](https://github.com/prisma/prisma/issues/8950)
+
+对于 PostgreSQL，Prisma Client 目前不支持使用索引来加速全文搜索。对此已有一个现有的 [GitHub Issue](https://github.com/prisma/prisma/issues/8950)
 
 对于 MySQL，需要将索引添加到使用 schema.prisma 文件中的 @@fulltext 参数搜索的任何列。为此，必须启用“fullTextIndex”预览功能。
 在以下示例中，一个全文索引添加到 Blog 模型的内容字段，另一个全文索引同时添加到内容和标题字段：
+
 ```prisma
 generator client {
   provider        = "prisma-client-js"
@@ -4598,39 +4611,43 @@ model Blog {
   @@fulltext([content, title])
 }
 ```
+
 第一个索引允许在内容字段中搜索单词“cat”的出现：
+
 ```ts
 const result = await prisma.blogs.findMany({
   where: {
     content: {
-      search: 'cat',
+      search: "cat",
     },
   },
-})
+});
 ```
+
 第二个索引允许在内容和标题字段中搜索内容中出现的单词“cat”和标题中出现的“food”：
+
 ```ts
 const result = await prisma.blogs.findMany({
   where: {
     content: {
-      search: 'cat',
+      search: "cat",
     },
     title: {
-      search: 'food',
+      search: "food",
     },
   },
-})
+});
 ```
+
 但是，如果您尝试仅搜索标题，则搜索将失败，并显示错误“无法找到用于搜索的全文索引”，并且消息代码为 P2030，因为搜索需要在两个字段上都有索引。
 
-
 #### 使用原始 SQL 进行全文搜索 ​
+
 全文搜索当前处于预览状态，由于已知问题，您可能会遇到搜索查询速度缓慢的情况。如果是这样，您可以使用 [TypedSQL](#typedsql) 优化查询。
 
-##### [对于PostgreSQL](https://www.prisma.io/docs/orm/prisma-client/queries/full-text-search#postgresql-2)
+##### [对于 PostgreSQL](https://www.prisma.io/docs/orm/prisma-client/queries/full-text-search#postgresql-2)
 
-##### [对于MySQL](https://www.prisma.io/docs/orm/prisma-client/queries/full-text-search#mysql-2)
-
+##### [对于 MySQL](https://www.prisma.io/docs/orm/prisma-client/queries/full-text-search#mysql-2)
 
 ### Custom validation
 

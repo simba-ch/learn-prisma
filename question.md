@@ -19,3 +19,6 @@ model Profile {
 **question**： 如果使用嵌套创建，能不能同时创建 `user` 和 `profile`
 **answer**：可以
 
+# 关系计数_count的使用
+
+# select 和 include 的实质区别（似乎可以共同使用）
