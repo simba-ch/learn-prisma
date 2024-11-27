@@ -4462,11 +4462,174 @@ await prisma.$transaction([iRunFirst, iRunSecond, iRunThird]);
 如果您有一个现有的应用程序，那么重构您的应用程序以使用乐观并发控制可能是一项艰巨的任务。交互式交易为此类情况提供了一个有用的逃生口。
 要创建交互式事务，请将异步函数传递到 $transaction 中。
 
-
 ### Full-text search
+
 Prisma Client 支持 2.30.0 及更高版本的 PostgreSQL 数据库以及 3.8.0 及更高版本的 MySQL 数据库的全文搜索。启用全文搜索后，您可以通过在数据库列中搜索文本来向应用程序添加搜索功能。
 
+**NOTE:**
+_注意：全文搜索功能目前存在一个已知问题。如果您观察到搜索查询速度缓慢，则可以使用原始 SQL 优化查询。_
 
+#### 启用全文搜索 ​
+
+全文搜索 API 目前是预览功能。要启用此功能，请执行以下步骤：
+
+1. 更新架构中的 `PreviewFeatures` 块以包含 `fullTextSearch` 预览功能标志：
+
+```prisma
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["fullTextSearch"]
+}
+```
+
+对于 MySQL，您还需要包含 `fullTextIndex` 预览功能标志：
+
+```prisma
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["fullTextSearch", "fullTextIndex"]
+}
+```
+
+2. 生成 Prisma 客户端：
+
+```cmd
+npx prisma generate
+```
+重新生成客户端后，在模型上创建的任何字符串字段上都将提供新的搜索字段。例如，以下搜索将返回包含单词“cat”的所有帖子。
+```ts
+// All posts that contain the word 'cat'.
+const result = await prisma.posts.findMany({
+  where: {
+    body: {
+      search: 'cat',
+    },
+  },
+})
+```
+
+#### 查询数据库 ​
+搜索字段在底层使用数据库的本机查询功能。这意味着可用的确切查询运算符也是特定于数据库的。
+以下示例演示了 PostgreSQL 'and' (&) 和 'or' (|) 运算符的用法：
+```ts
+// All posts that contain the words 'cat' or 'dog'.
+const result = await prisma.posts.findMany({
+  where: {
+    body: {
+      search: 'cat | dog',
+    },
+  },
+})
+
+// All drafts that contain the words 'cat' and 'dog'.
+const result = await prisma.posts.findMany({
+  where: {
+    status: 'Draft',
+    body: {
+      search: 'cat & dog',
+    },
+  },
+})
+```
+
+以下示例演示了 MySQL 'and' (+) 和 'not' (-) 运算符的使用：
+```ts
+// All posts that contain the words 'cat' or 'dog'.
+const result = await prisma.posts.findMany({
+  where: {
+    body: {
+      search: 'cat dog',
+    },
+  },
+})
+
+// All posts that contain the words 'cat' and not 'dog'.
+const result = await prisma.posts.findMany({
+  where: {
+    body: {
+      search: '+cat -dog',
+    },
+  },
+})
+
+// All drafts that contain the words 'cat' and 'dog'.
+const result = await prisma.posts.findMany({
+  where: {
+    status: 'Draft',
+    body: {
+      search: '+cat +dog',
+    },
+  },
+})
+```
+
+#### 按相关性对结果进行排序
+除了 Prisma Client 的默认 orderBy 行为之外，全文搜索还添加了按与给定字符串或字符串的相关性进行排序。
+例如，如果您想根据帖子与标题中术语“数据库”的相关性对帖子进行排序，则可以使用以下命令：
+```ts
+const posts = await prisma.post.findMany({
+  orderBy: {
+    _relevance: {
+      fields: ['title'],
+      search: 'database',
+      sort: 'asc'
+    },
+  },
+})
+```
+
+#### 添加索引 ​
+对于PostgreSQL，Prisma Client 目前不支持使用索引来加速全文搜索。对此已有一个现有的 [GitHub Issue](https://github.com/prisma/prisma/issues/8950)
+
+对于 MySQL，需要将索引添加到使用 schema.prisma 文件中的 @@fulltext 参数搜索的任何列。为此，必须启用“fullTextIndex”预览功能。
+在以下示例中，一个全文索引添加到 Blog 模型的内容字段，另一个全文索引同时添加到内容和标题字段：
+```prisma
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["fullTextSearch", "fullTextIndex"]
+}
+
+model Blog {
+  id      Int    @unique
+  content String
+  title   String
+
+  @@fulltext([content])
+  @@fulltext([content, title])
+}
+```
+第一个索引允许在内容字段中搜索单词“cat”的出现：
+```ts
+const result = await prisma.blogs.findMany({
+  where: {
+    content: {
+      search: 'cat',
+    },
+  },
+})
+```
+第二个索引允许在内容和标题字段中搜索内容中出现的单词“cat”和标题中出现的“food”：
+```ts
+const result = await prisma.blogs.findMany({
+  where: {
+    content: {
+      search: 'cat',
+    },
+    title: {
+      search: 'food',
+    },
+  },
+})
+```
+但是，如果您尝试仅搜索标题，则搜索将失败，并显示错误“无法找到用于搜索的全文索引”，并且消息代码为 P2030，因为搜索需要在两个字段上都有索引。
+
+
+#### 使用原始 SQL 进行全文搜索 ​
+全文搜索当前处于预览状态，由于已知问题，您可能会遇到搜索查询速度缓慢的情况。如果是这样，您可以使用 [TypedSQL](#typedsql) 优化查询。
+
+##### [对于PostgreSQL](https://www.prisma.io/docs/orm/prisma-client/queries/full-text-search#postgresql-2)
+
+##### [对于MySQL](https://www.prisma.io/docs/orm/prisma-client/queries/full-text-search#mysql-2)
 
 
 ### Custom validation
