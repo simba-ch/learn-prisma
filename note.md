@@ -2634,7 +2634,7 @@ const result = await prisma.user.update({
 });
 ```
 
-##### 删除所有相关记录​
+##### 删除所有相关记录 ​
 
 删除所有相关的 Post 记录：
 
@@ -2654,7 +2654,7 @@ const result = await prisma.user.update({
 });
 ```
 
-##### 删除特定相关记录​
+##### 删除特定相关记录 ​
 
 通过删除所有未发布的帖子来更新用户：
 
@@ -2857,7 +2857,7 @@ const users = await prisma.post.findMany({
 });
 ```
 
-##### 过滤缺少 “-to-many” 关系
+##### 过滤不存在的 “-to-many” 关系
 
 例如，以下查询使用 `none` 返回具有零个帖子的所有用户
 
@@ -3047,7 +3047,7 @@ const res = await prisma.post.findMany({
 
 ##### 对标量列表/数组进行过滤 ​
 
-标量列表（例如，String[]）具有一组特殊的过滤条件 - 例如，以下查询返回标签数组包含数据库的所有帖子：
+标量列表（例如，String[]）具有一组特殊的[过滤条件](https://www.prisma.io/docs/orm/reference/prisma-client-reference#scalar-list-filters) - 例如，以下查询返回标签数组包含数据库的所有帖子：
 
 ```ts
 const posts = await client.post.findMany({
@@ -3881,8 +3881,8 @@ Prisma Client 支持六种不同的交易处理方式，适用于三种不同的
 Prisma 客户端提供以下使用事务的选项：
 
 - 嵌套写入：使用 Prisma 客户端 API 处理同一事务中一条或多条相关记录的多个操作。
-- Batch/bulk 事务：使用 updateMany、deleteMany 和 createMany 批量处理一个或多个操作。
-- THE `$transaction` API in Prisma Client：
+- Batch/bulk 事务：使用 `updateMany`、`deleteMany` 和 `createMany` 批量处理一个或多个操作。
+- The `$transaction` API in Prisma Client：
   - 顺序操作：使用 `$transaction<R>(queries: PrismaPromise<R>[]): Promise<R[]>` 传递要在事务内顺序执行的 Prisma Client 查询数组。
   - 交互式事务：传递一个函数，该函数可以包含用户代码，包括 Prisma 客户端查询、非 Prisma 代码和要在事务中执行的其他控制流，使用 `$transaction<R>(fn: (prisma: PrismaClient) => R, options ?: object): R`
 
@@ -3999,7 +3999,7 @@ try {
 
 ###### 交易选项
 
-交易 API 有第二个参数。对于交互式事务，您可以在此参数中使用以下可选配置选项：-
+交易 API 有第二个参数。对于交互式事务，您可以在此参数中使用以下可选配置选项：
 
 - `maxWait`：Prisma 客户端等待从数据库获取事务的最长时间。默认值为 2 秒。
 - `timeout`：交互式事务在被取消和回滚之前可以运行的最长时间。默认值为 5 秒。
@@ -4033,6 +4033,8 @@ const prisma = new PrismaClient({
 ##### 事务隔离级别 ​
 
 您可以为事务设置事务隔离级别。
+
+**INFO**：_此功能在 MongoDB 上不可用，因为 MongoDB 不支持隔离级别。_
 
 ###### 设置隔离级别 ​
 
@@ -4076,20 +4078,31 @@ Prisma Client 支持以下隔离级别（如果底层数据库中可用）：
 - Snapshot
 - Serializable
 
+每个数据库连接器可用的隔离级别如下：
+
+| Database    | ReadUncommitted | ReadCommitted | RepeatableRead | Snapshot | Serializable |
+| ----------- | --------------- | ------------- | -------------- | -------- | ------------ |
+| PostgreSQL  | ✔️              | ✔️            | ✔️             | No       | ✔️           |
+| MySQL       | ✔️              | ✔️            | ✔️             | No       | ✔️           |
+| SQL Server  | ✔️              | ✔️            | ✔️             | ✔️       | ✔️           |
+| CockroachDB | No              | No            | No             | No       | ✔️           |
+| SQLite      | No              | No            | No             | No       | ✔️           |
+
 默认情况下，Prisma 客户端将隔离级别设置为数据库中当前配置的值。
 
 每个数据库默认配置的隔离级别如下：
-|Database|Default|
-|--|--|
-|PostgreSQL|ReadCommitted|
-|MySQL|RepeatableRead|
-|SQL Server|ReadCommitted|
-|CockroachDB|Serializable|
-|SQLite|Serializable|
+
+| Database    | Default        |
+| ----------- | -------------- |
+| PostgreSQL  | ReadCommitted  |
+| MySQL       | RepeatableRead |
+| SQL Server  | ReadCommitted  |
+| CockroachDB | Serializable   |
+| SQLite      | Serializable   |
 
 ##### 交易时间问题 ​ ​
 
-INFO：
+**INFO：**
 
 - 本节中的解决方案不适用于 MongoDB，因为 MongoDB 不支持隔离级别。
 - 本节讨论的时序问题不适用于 CockroachDB 和 SQLite，因为这些数据库仅支持最高的 Serialized 隔离级别。
@@ -4459,7 +4472,7 @@ await prisma.$transaction([iRunFirst, iRunSecond, iRunThird]);
 
 - [Why ROWLOCK Hints Can Make Queries Slower and Blocking Worse in SQL Server](https://kendralittle.com/2016/02/04/why-rowlock-hints-can-make-queries-slower-and-blocking-worse-in-sql-server/)
 
-###### [何时使用乐观并发控制](https://www.prisma.io/docs/orm/prisma-client/queries/transactions#scenario-reserving-a-seat-at-the-cinema) ​
+###### [场景：在电影院预订座位​](https://www.prisma.io/docs/orm/prisma-client/queries/transactions#scenario-reserving-a-seat-at-the-cinema) ​
 
 ##### 互动交易 ​
 
@@ -4571,6 +4584,8 @@ const result = await prisma.posts.findMany({
   },
 });
 ```
+
+有关支持的全部操作，请[参阅 MySQL 全文搜索文档](https://dev.mysql.com/doc/refman/8.0/en/fulltext-boolean.html)。
 
 #### 按相关性对结果进行排序
 
@@ -4685,34 +4700,78 @@ const result = await prisma.blogs.findMany({
 
 # MIGRATE
 
+## [Getting started](https://www.prisma.io/docs/orm/prisma-migrate/getting-started)
+
+## Understanding Prisma Migrate
+
+### [Overview](https://www.prisma.io/docs/orm/prisma-migrate/understanding-prisma-migrate/overview)
+
+### [Mental model](https://www.prisma.io/docs/orm/prisma-migrate/understanding-prisma-migrate/mental-model)
+
+### [About migration histories](https://www.prisma.io/docs/orm/prisma-migrate/understanding-prisma-migrate/migration-histories)
+
+### [About the shadow database](https://www.prisma.io/docs/orm/prisma-migrate/understanding-prisma-migrate/shadow-database)
+
+### [Limitations and known issues](https://www.prisma.io/docs/orm/prisma-migrate/understanding-prisma-migrate/limitations-and-known-issues)
+
+## Workflows
+
+### [Seeding](https://www.prisma.io/docs/orm/prisma-migrate/workflows/seeding)
+
+### [Prototyping your schema](https://www.prisma.io/docs/orm/prisma-migrate/workflows/prototyping-your-schema)
+
+### [Baselining a database](https://www.prisma.io/docs/orm/prisma-migrate/workflows/baselining)
+
+### [Customizing migrations](https://www.prisma.io/docs/orm/prisma-migrate/workflows/customizing-migrations)
+
+### [Data migrations](https://www.prisma.io/docs/orm/prisma-migrate/workflows/data-migration)
+
+### [Squashing migrations](https://www.prisma.io/docs/orm/prisma-migrate/workflows/squashing-migrations)
+
+### [Generating down migrations](https://www.prisma.io/docs/orm/prisma-migrate/workflows/generating-down-migrations)
+
+### [Patching & hotfixing](https://www.prisma.io/docs/orm/prisma-migrate/workflows/patching-and-hotfixing)
+
+### [Unsupported database features](https://www.prisma.io/docs/orm/prisma-migrate/workflows/unsupported-database-features)
+
+### [Development and production](https://www.prisma.io/docs/orm/prisma-migrate/workflows/development-and-production)
+
+### [Team development](https://www.prisma.io/docs/orm/prisma-migrate/workflows/team-development)
+
+### [Native database types](https://www.prisma.io/docs/orm/prisma-migrate/workflows/native-database-types)
+
+### [Native database functions](https://www.prisma.io/docs/orm/prisma-migrate/workflows/native-database-functions)
+
+### [Troubleshooting](https://www.prisma.io/docs/orm/prisma-migrate/workflows/troubleshooting)
+
 # 工具
+
+## [Prisma CLI](https://www.prisma.io/docs/orm/tools/prisma-cli)
+
+## [Prisma Studio](https://www.prisma.io/docs/orm/tools/prisma-studio)
 
 # 参考
 
-## Prisma Client API
+## [Prisma Client API](https://www.prisma.io/docs/orm/reference/prisma-client-reference)
 
-### PrismaClient
+## [Prisma Schema](https://www.prisma.io/docs/orm/reference/prisma-schema-reference)
 
-### Model queries
+## [Prisma CLI](https://www.prisma.io/docs/orm/reference/prisma-cli-reference)
 
-### Model query options
+## [Errors](https://www.prisma.io/docs/orm/reference/error-reference)
 
-### Nested queries
+## [Environment variables](https://www.prisma.io/docs/orm/reference/environment-variables-reference)
 
-### Filter conditions and operators
+## [Database features matrix](https://www.prisma.io/docs/orm/reference/database-features)
 
-### Relation filters
+## [Supported databases](https://www.prisma.io/docs/orm/reference/supported-databases)
 
-### Scalar list methods
+## [Connection URLs](https://www.prisma.io/docs/orm/reference/connection-urls)
 
-### Scalar list filters
+## [System requirements](https://www.prisma.io/docs/orm/reference/system-requirements)
 
-### Composite type methods
+## Preview features
 
-### Composite type filters
+### [Prisma Client & Prisma schema](https://www.prisma.io/docs/orm/reference/preview-features/client-preview-features)
 
-### Atomic number operations
-
-### Json filters
-
-### Client methods
+### [Prisma CLI](https://www.prisma.io/docs/orm/reference/preview-features/cli-preview-features)
