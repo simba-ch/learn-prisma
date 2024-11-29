@@ -4472,7 +4472,7 @@ await prisma.$transaction([iRunFirst, iRunSecond, iRunThird]);
 
 - [Why ROWLOCK Hints Can Make Queries Slower and Blocking Worse in SQL Server](https://kendralittle.com/2016/02/04/why-rowlock-hints-can-make-queries-slower-and-blocking-worse-in-sql-server/)
 
-###### [场景：在电影院预订座位​](https://www.prisma.io/docs/orm/prisma-client/queries/transactions#scenario-reserving-a-seat-at-the-cinema) ​
+###### [场景：在电影院预订座位 ​](https://www.prisma.io/docs/orm/prisma-client/queries/transactions#scenario-reserving-a-seat-at-the-cinema) ​
 
 ##### 互动交易 ​
 
@@ -4589,7 +4589,7 @@ const result = await prisma.posts.findMany({
 
 #### 按相关性对结果进行排序
 
-除了 Prisma Client 的默认 orderBy 行为之外，全文搜索还添加了按与给定字符串或字符串的相关性进行排序。
+除了 Prisma Client 的默认 `orderBy` 行为之外，全文搜索还添加了按与给定字符串或字符串的相关性进行排序。
 例如，如果您想根据帖子与标题中术语“数据库”的相关性对帖子进行排序，则可以使用以下命令：
 
 ```ts
@@ -4666,15 +4666,686 @@ const result = await prisma.blogs.findMany({
 
 ### Custom validation
 
+您可以通过以下方式之一为 Prisma 客户端查询的用户输入添加运行时验证：
+
+- [Prisma Client extensions](https://www.prisma.io/docs/orm/prisma-client/client-extensions)
+- 自定义函数
+
+您可以使用任何您想要的验证库。 Node.js 生态系统提供了许多高质量、易于使用的验证库可供选择，包括：joi、validator.js、Yup、Zod 和 Superstruct。
+
+#### 使用 Prisma 客户端扩展进行输入验证 ​
+
+此示例在使用 Zod 架构创建和更新值时添加运行时验证，以检查传递到 Prisma 客户端的数据是否有效。
+
+**WARNING：**
+_查询扩展当前不适用于嵌套操作。_
+_在此示例中，验证仅在传递给 prisma.product.create() 等方法的顶级数据对象上运行。以这种方式实现的验证不会自动运行嵌套写入。_
+
+```ts
+import { PrismaClient, Prisma } from "@prisma/client";
+import { z } from "zod";
+
+/**
+ * Zod schema
+ */
+export const ProductCreateInput = z.object({
+  slug: z
+    .string()
+    .max(100)
+    .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
+  name: z.string().max(100),
+  description: z.string().max(1000),
+  price: z
+    .instanceof(Prisma.Decimal)
+    .refine((price) => price.gte("0.01") && price.lt("1000000.00")),
+}) satisfies z.Schema<Prisma.ProductUncheckedCreateInput>;
+
+/**
+ * Prisma Client Extension
+ */
+const prisma = new PrismaClient().$extends({
+  query: {
+    product: {
+      create({ args, query }) {
+        args.data = ProductCreateInput.parse(args.data);
+        return query(args);
+      },
+      update({ args, query }) {
+        args.data = ProductCreateInput.partial().parse(args.data);
+        return query(args);
+      },
+      updateMany({ args, query }) {
+        args.data = ProductCreateInput.partial().parse(args.data);
+        return query(args);
+      },
+      upsert({ args, query }) {
+        args.create = ProductCreateInput.parse(args.create);
+        args.update = ProductCreateInput.partial().parse(args.update);
+        return query(args);
+      },
+    },
+  },
+});
+
+async function main() {
+  /**
+   * Example usage
+   */
+  // Valid product
+  const product = await prisma.product.create({
+    data: {
+      slug: "example-product",
+      name: "Example Product",
+      description: "Lorem ipsum dolor sit amet",
+      price: new Prisma.Decimal("10.95"),
+    },
+  });
+
+  // Invalid product
+  try {
+    await prisma.product.create({
+      data: {
+        slug: "invalid-product",
+        name: "Invalid Product",
+        description: "Lorem ipsum dolor sit amet",
+        price: new Prisma.Decimal("-1.00"),
+      },
+    });
+  } catch (err: any) {
+    console.log(err?.cause?.issues);
+  }
+}
+
+main();
+```
+
+上面的示例使用 Zod 架构在将记录写入数据库之前在运行时验证和解析查询中提供的数据。
+
+#### 使用自定义验证函数进行输入验证 ​​
+
+以下是使用 Superstruct 验证注册新用户所需的数据是否正确的示例：
+
+```ts
+import { PrismaClient, Prisma, User } from "@prisma/client";
+import { assert, object, string, size, refine } from "superstruct";
+import isEmail from "isemail";
+
+const prisma = new PrismaClient();
+
+// Runtime validation
+const Signup = object({
+  // string and a valid email address
+  email: refine(string(), "email", (v) => isEmail.validate(v)),
+  // password is between 7 and 30 characters long
+  password: size(string(), 7, 30),
+  // first name is between 2 and 50 characters long
+  firstName: size(string(), 2, 50),
+  // last name is between 2 and 50 characters long
+  lastName: size(string(), 2, 50),
+});
+
+type Signup = Omit<Prisma.UserCreateArgs["data"], "id">;
+
+// Signup function
+async function signup(input: Signup): Promise<User> {
+  // Assert that input conforms to Signup, throwing with a helpful
+  // error message if input is invalid.
+  assert(input, Signup);
+  return prisma.user.create({
+    data: input.user,
+  });
+}
+```
+
+上面的示例展示了如何创建自定义类型安全注册函数，以确保在创建用户之前输入有效。
+
+#### [Going further](https://www.prisma.io/docs/orm/prisma-client/queries/custom-validation#going-further)
+
 ### Computed fields
+
+计算字段允许您根据现有数据派生新字段。
+一个常见的例子是当您想要计算全名时。在数据库中，您可能只存储名字和姓氏，但您可以定义一个函数，通过组合名字和姓氏来计算全名。
+计算字段是只读的，存储在应用程序的内存中，而不是数据库中。
+
+#### 使用 Prisma 客户端扩展 ​
+
+以下示例说明如何创建 Prisma 客户端扩展，该扩展在运行时将 fullName 计算字段添加到 Prisma 架构中的用户模型中。
+
+```ts
+import { PrismaClient } from "@prisma/client";
+
+const prisma = new PrismaClient().$extends({
+  result: {
+    user: {
+      fullName: {
+        needs: { firstName: true, lastName: true },
+        compute(user) {
+          return `${user.firstName} ${user.lastName}`;
+        },
+      },
+    },
+  },
+});
+
+async function main() {
+  /**
+   * Example query containing the `fullName` computed field in the response
+   */
+  const user = await prisma.user.findFirst();
+}
+
+main();
+```
+
+计算字段是类型安全的，可以返回从串联值到复杂对象或函数的任何内容，这些对象或函数可以充当模型的实例方法。
+
+#### [Going further​](https://www.prisma.io/docs/orm/prisma-client/queries/computed-fields#going-further)
 
 ### Excluding fields
 
+默认情况下，Prisma 客户端返回模型中的所有字段。您可以使用 select 来缩小结果集，但如果您有一个大型模型并且只想排除一两个字段，那么这可能会很麻烦。
+
+**INFO：**
+从 Prisma ORM 5.16.0 开始，通过 omitApi 预览功能支持全局和本地排除字段。
+
+#### 使用 omit 全局排除字段 ​
+
+以下是使用 omitApi 预览功能全局排除字段的类型安全方法：
+
+```prisma
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["omitApi"]
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  firstName String
+  lastName  String
+  email     String   @unique
+  password  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+```
+
+```ts
+const prisma = new PrismaClient({
+  omit: {
+    user: {
+      password: true,
+    },
+  },
+});
+
+// The password field is excluded in all queries, including this one
+const user = await prisma.user.findUnique({ where: { id: 1 } });
+```
+
+#### 使用 omit 本地排除字段 ​
+
+以下是使用 omitApi 预览功能在本地排除字段的类型安全方法：
+
+```prisma
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["omitApi"]
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  firstName String
+  lastName  String
+  email     String   @unique
+  password  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+```
+
+```ts
+const prisma = new PrismaClient();
+
+// The password field is excluded only in this query
+const user = await prisma.user.findUnique({
+  omit: {
+    password: true,
+  },
+  where: {
+    id: 1,
+  },
+});
+```
+
+#### 如何省略多个字段 ​
+
+省略多个字段与选择多个字段的作用相同：将多个键值对添加到省略选项。使用与以前相同的架构，您可以通过以下方式省略密码和电子邮件：
+
+```ts
+const prisma = new PrismaClient();
+
+// password and email are excluded
+const user = await prisma.user.findUnique({
+  omit: {
+    email: true,
+    password: true,
+  },
+  where: {
+    id: 1,
+  },
+});
+```
+
+可以局部和全局省略多个字段。
+
+#### 如何省略多个字段 ​
+
+如果全局省略某个字段，则可以通过专门`select`该字段或在查询中将 `omit` 设置为 `false` 来“覆盖”。
+
+```ts
+// 使用 select 选择字段
+const user = await prisma.user.findUnique({
+  select: {
+    firstName: true,
+    lastName: true,
+    password: true, // The password field is now selected.
+  },
+  where: {
+    id: 1,
+  },
+});
+
+// 设置 omit 为 false 来覆盖全局设置
+const user = await prisma.user.findUnique({
+  omit: {
+    password: false, // The password field is now selected.
+  },
+  where: {
+    id: 1,
+  },
+});
+```
+
+#### 何时在全局或本地使用省略 ​
+
+了解何时全局或本地省略字段非常重要：
+
+- 如果您为了防止意外包含在查询中而省略某个字段，则最好全局省略它。
+  例如：从用户模型中全局省略密码字段，以便敏感信息不会意外暴露。
+- 如果您因为查询中不需要而省略某个字段，则最好在本地省略它。
+  本地省略（当查询中提供省略选项时）仅适用于定义它的查询，而全局省略适用于使用同一 Prisma 客户端实例进行的每个查询，除非使用特定选择或覆盖省略。
+
+#### 不使用 omit 排除密码字段 ​
+
+以下是类型安全排除函数返回不带密码字段的用户。
+
+```ts
+// Exclude keys from user
+function exclude<User, Key extends keyof User>(
+  user: User,
+  keys: Key[]
+): Omit<User, Key> {
+  return Object.fromEntries(
+    Object.entries(user).filter(([key]) => !keys.includes(key))
+  );
+}
+
+function main() {
+  const user = await prisma.user.findUnique({ where: 1 });
+  const userWithoutPassword = exclude(user, ["password"]);
+}
+```
+
+在 TypeScript 示例中，我们提供了两个泛型：User 和 Key。通用密钥定义为用户的密钥（例如电子邮件、密码、名字等）。
+这些泛型在逻辑中流动，返回一个省略所提供的键列表的用户。
+
 ### Custom models
+
+随着应用程序的增长，您可能会发现需要将相关逻辑组合在一起。我们建议：
+
+- 使用 Prisma 客户端扩展创建静态方法
+- 将模型包装在类中
+- 扩展 Prisma Client 模型对象
+
+#### 具有 Prisma 客户端扩展的静态方法 ​
+
+以下示例演示如何创建 Prisma 客户端扩展，以向用户模型添加 signUp 和 findManyByDomain 方法。
+
+```prisma
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id       String    @id @default(cuid())
+  email    String
+  password Password?
+}
+
+model Password {
+  hash   String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String @unique
+}
+```
+
+```ts
+import bcrypt from "bcryptjs";
+import { PrismaClient } from "@prisma/client";
+
+const prisma = new PrismaClient().$extends({
+  model: {
+    user: {
+      async signUp(email: string, password: string) {
+        const hash = await bcrypt.hash(password, 10);
+        return prisma.user.create({
+          data: {
+            email,
+            password: {
+              create: {
+                hash,
+              },
+            },
+          },
+        });
+      },
+
+      async findManyByDomain(domain: string) {
+        return prisma.user.findMany({
+          where: { email: { endsWith: `@${domain}` } },
+        });
+      },
+    },
+  },
+});
+
+async function main() {
+  // Example usage
+  await prisma.user.signUp("user2@example2.com", "s3cret");
+
+  await prisma.user.findManyByDomain("example2.com");
+}
+```
+
+#### 将模型包装在类中 ​
+
+在下面的示例中，您将看到如何将 Prisma 客户端中的用户模型包装在 Users 类中。
+
+```ts
+import { PrismaClient, User } from "@prisma/client";
+
+type Signup = {
+  email: string;
+  firstName: string;
+  lastName: string;
+};
+
+class Users {
+  constructor(private readonly prismaUser: PrismaClient["user"]) {}
+
+  // Signup a new user
+  async signup(data: Signup): Promise<User> {
+    // do some custom validation...
+    return this.prismaUser.create({ data });
+  }
+}
+
+async function main() {
+  const prisma = new PrismaClient();
+  const users = new Users(prisma.user);
+  const user = await users.signup({
+    email: "alice@prisma.io",
+    firstName: "Alice",
+    lastName: "Prisma",
+  });
+}
+```
+
+使用这个新的 Users 类，您可以定义注册等自定义功能：
+请注意，在上面的示例中，您仅公开了 Prisma 客户端的注册方法。 Prisma 客户端隐藏在 Users 类中，因此您无法再调用 findMany 和 upsert 等方法。
+当您拥有大型应用程序并且您想要有意限制模型的功能时，此方法非常有效。
+
+#### 扩展 Prisma Client 模型对象
+
+但是，如果您不想隐藏现有功能但仍想将自定义功能分组在一起怎么办？
+在这种情况下，您可以使用 Object.assign 来扩展 Prisma Client，而不限制其功能：
+
+```ts
+import { PrismaClient, User } from "@prisma/client";
+
+type Signup = {
+  email: string;
+  firstName: string;
+  lastName: string;
+};
+
+function Users(prismaUser: PrismaClient["user"]) {
+  return Object.assign(prismaUser, {
+    /**
+     * Signup the first user and create a new team of one. Return the User with
+     * a full name and without a password
+     */
+    async signup(data: Signup): Promise<User> {
+      return prismaUser.create({ data });
+    },
+  });
+}
+
+async function main() {
+  const prisma = new PrismaClient();
+  const users = Users(prisma.user);
+  const user = await users.signup({
+    email: "alice@prisma.io",
+    firstName: "Alice",
+    lastName: "Prisma",
+  });
+  const numUsers = await users.count();
+  console.log(user, numUsers);
+}
+```
+
+现在，您可以将自定义注册方法与 count、updateMany、groupBy() 以及 Prisma Client 提供的所有其他精彩方法一起使用。最重要的是，它都是类型安全的！
+
+#### [Going further](https://www.prisma.io/docs/orm/prisma-client/queries/custom-models#going-further)
 
 ### Case sensitivity
 
+区分大小写会影响数据的过滤和排序，并由数据库排序规则决定。根据您的设置，排序和过滤数据会产生不同的结果。
+
+如果您使用关系数据库连接器，Prisma Client 会尊重您的数据库排序规则。使用 Prisma Client 支持不区分大小写的过滤和排序的选项和建议取决于您的数据库提供商。
+
+如果您使用 MongoDB 连接器，Prisma 客户端将使用 RegEx 规则来启用不区分大小写的过滤。连接器不使用 MongoDB 排序规则 。
+
+#### 数据库排序规则和区分大小写 ​
+
+**INFO：**
+_在 Prisma 客户端上下文中，以下部分仅涉及关系数据库连接器。_
+
+排序规则指定数据在数据库中的排序和比较方式，其中包括大小写。排序规则是您在设置数据库时选择的内容。
+
+#### 不区分大小写的过滤选项 ​
+
+使用 Prisma Client 支持不区分大小写过滤的推荐方法取决于您的底层提供商。
+
+##### PostgreSQL provider
+
+PostgreSQL 默认使用确定性排序规则，这意味着过滤区分大小写。要支持不区分大小写的过滤，请在每个字段上使用 mode: 'insensitive' 属性。
+使用过滤器的`mode`属性，如下所示：
+
+```ts
+const users = await prisma.user.findMany({
+  where: {
+    email: {
+      endsWith: "prisma.io",
+      mode: "insensitive", // Default value: default
+    },
+  },
+});
+```
+
+另请参阅：[过滤（不区分大小写的过滤）](https://www.prisma.io/docs/orm/prisma-client/queries/filtering-and-sorting#case-insensitive-filtering)
+
+###### 注意事项
+
+- 您不能将不区分大小写的过滤与 C 排序规则一起使用
+- [citext](https://www.postgresql.org/docs/12/citext.html)行总是不区分大小写的，并且不受 `mode` 属性影响
+
+###### 性能
+
+如果您严重依赖不区分大小写的过滤，请考虑在 PostgreSQL 数据库中创建索引以提高性能：
+
+- [Create an expression index](https://www.postgresql.org/docs/current/indexes-expressional.html) for Prisma Client queries that use equals or not
+- Use the pg_trgm module to [create a trigram-based index](https://www.postgresql.org/docs/12/pgtrgm.html#id-1.11.7.40.7) for Prisma Client queries that use startsWith, endsWith, contains (maps toLIKE / ILIKE in PostgreSQL)
+
+##### MySQL provider
+
+MySQL 默认使用不区分大小写的排序规则。因此，使用 Prisma Client 和 MySQL 进行过滤默认不区分大小写。
+`mode: 'insensitive'`属性不是必需的，因此在生成的 Prisma 客户端 API 中不可用。
+
+###### 注意事项
+
+您必须使用不区分大小写 (\_ci) 排序规则才能支持不区分大小写的过滤。 Prisma 客户端不支持 MySQL 提供程序的模式过滤器属性。
+
+##### MongoDB provider
+
+要支持不区分大小写的过滤，请在每个字段的基础上使用 `mode: 'insensitive'` 属性：
+
+```ts
+const users = await prisma.user.findMany({
+  where: {
+    email: {
+      endsWith: "prisma.io",
+      mode: "insensitive", // Default value: default
+    },
+  },
+});
+```
+
+MongoDB 使用 RegEx 规则进行不区分大小写的过滤。
+
+##### SQLite provider
+
+默认情况下，Prisma 客户端在 SQLite 数据库中创建的文本字段不支持不区分大小写的过滤。在 SQLite 中，只能对 ASCII 字符进行不区分大小写的比较。
+要为每列的不区分大小写的过滤启用有限支持（仅限 ASCII），您需要在定义文本列时添加 COLLATE NOCASE。
+
+###### 向新列添加不区分大小写的过滤。​
+
+要将不区分大小写的过滤添加到新列，您将需要修改 Prisma Client 创建的迁移文件。
+
+1. 采用以下 Prisma Schema 模型：
+
+```prisma
+model User {
+  id    Int    @id
+  email String
+}
+```
+
+2. 并使用 `prisma migrate dev --create-only` 创建以下迁移文件：
+
+```sql
+-- CreateTable
+CREATE TABLE "User" (
+    "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    "email" TEXT NOT NULL
+);
+```
+
+3. 您需要将 COLLATE NOCASE 添加到电子邮件列，以便可以进行不区分大小写的过滤：
+
+```sql
+-- CreateTable
+CREATE TABLE "User" (
+    "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    //highlight-next-line
+    "email" TEXT NOT NULL COLLATE NOCASE
+);
+```
+
+###### 向现有列添加不区分大小写的过滤。​
+
+由于在 SQLite 中无法更新列，因此只能通过创建空白迁移文件并将数据迁移到新表来将 COLLATE NOCASE 添加到现有列。
+
+1. 采用以下 Prisma Schema 模型：
+
+```prisma
+model User {
+  id    Int    @id
+  email String
+}
+```
+
+2. 并使用 `prisma migrate dev --create-only` 创建一个空的迁移文件，您将需要重命名当前的 User 表并使用 COLLATE NOCASE 创建一个新的 User 表。
+
+```sql
+-- UpdateTable
+ALTER TABLE "User" RENAME TO "User_old";
+
+CREATE TABLE "User" (
+    "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    "email" TEXT NOT NULL COLLATE NOCASE
+);
+
+INSERT INTO "User" (id, email)
+SELECT id, email FROM "User_old";
+
+DROP TABLE "User_old";
+```
+
+##### Microsoft SQL Server provider
+
+Microsoft SQL Server 默认使用不区分大小写的排序规则。因此，使用 Prisma Client 和 Microsoft SQL Server 进行过滤默认情况下不区分大小写。
+`mode: 'insensitive'`属性不是必需的，因此在生成的 Prisma 客户端 API 中不可用。
+
 ### Query optimization
+
+#### 调试性能问题​
+几种常见的做法可能会导致查询缓慢和性能问题，例如：
+- 过度获取数据
+- 缺失索引
+- 不缓存重复的查询
+- 执行全表扫描
+
+**INFO：**
+*有关性能问题的更多潜在原因，请访问[此页面](https://www.prisma.io/docs/optimize/recommendations)。*
+
+[Prisma Optimize](https://www.prisma.io/docs/optimize)提供[建议](https://www.prisma.io/docs/optimize/recommendations)来识别和解决上面列出的低效问题以及其他问题，从而帮助提高查询性能。
+
+首先，请按照[集成指南](https://www.prisma.io/docs/optimize/getting-started)并将 Prisma Optimize 添加到您的项目中以开始诊断慢速查询。
+
+**TIP：**
+*您还可以在[客户端级别记录查询事件](https://www.prisma.io/docs/orm/prisma-client/observability-and-logging/logging#event-based-logging)，以查看生成的查询、其参数和执行时间。*
+*如果您特别关注监控查询持续时间，请考虑使用[日志记录中间件](https://www.prisma.io/docs/orm/prisma-client/client-extensions/middleware/logging-middleware)。*
+
+
+#### 使用批量查询
+批量读取和写入大量数据通常性能更高。
+PrismaClient 支持以下批量查询：
+- createMany()
+- createManyAndReturn()
+- deleteMany()
+- updateMany()
+- findMany()
+
+
+#### 重用PrismaClient或使用连接池以避免数据库连接池耗尽
+创建 PrismaClient 的多个实例可能会耗尽数据库连接池，尤其是在无服务器或边缘环境中，可能会减慢其他查询的速度。在无服务器挑战中[了解更多信息](https://www.prisma.io/docs/orm/prisma-client/setup-and-configuration/databases-connections#the-serverless-challenge)。
+
+对于具有传统服务器的应用程序，实例化 PrismaClient 一次并在整个应用程序中重复使用它，而不是创建多个实例。
+
+对于具有使用 HMR（热模块替换）框架的无服务器开发环境，请确保在[开发中正确处理 Prisma 的单个实例](https://www.prisma.io/docs/orm/more/help-and-troubleshooting/help-articles/nextjs-prisma-client-dev-practices)。
+
+#### 解决n+1问题​
+当您循环查询的结果并对每个结果执行一个额外的查询时，就会出现 n+1 问题，从而导致 n 个查询加上原始的 (n+1) 个查询。
+这是 ORM 的一个常见问题，特别是与 GraphQL 结合使用时，因为代码生成低效查询并不总是立即显而易见。
+
+##### [使用 `findUnique()` 和 Prisma 客户端的数据加载器在 GraphQL 中求解 n+1​](https://www.prisma.io/docs/orm/prisma-client/queries/query-optimization-performance#solving-n1-in-graphql-with-findunique-and-prisma-clients-dataloader)
+
 
 ## write your own SQL
 
