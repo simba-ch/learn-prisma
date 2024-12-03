@@ -3868,11 +3868,11 @@ const distinctRoles = await prisma.user.findMany({
 开发人员通过将操作包装在事务中来利用数据库提供的安全保证。
 
 Prisma Client 支持六种不同的交易处理方式，适用于三种不同的场景：
-|Scenario|Available techniques|
-|--|--|
-|Dependent writes|Nested writes|
-|Independent writes|<li> `$transaction([])` API </li> <li> Batch operations</li>|
-|Read, modify, write|<li>Idempotent operations</li> <li>Optimistic concurrency control</li> <li>Interactive transactions</li>|
+| Scenario            | Available techniques                                                                                     |
+| ------------------- | -------------------------------------------------------------------------------------------------------- |
+| Dependent writes    | Nested writes                                                                                            |
+| Independent writes  | <li> `$transaction([])` API </li> <li> Batch operations</li>                                             |
+| Read, modify, write | <li>Idempotent operations</li> <li>Optimistic concurrency control</li> <li>Interactive transactions</li> |
 
 您选择的技术取决于您的特定用例。
 
@@ -4082,11 +4082,11 @@ Prisma Client 支持以下隔离级别（如果底层数据库中可用）：
 
 | Database    | ReadUncommitted | ReadCommitted | RepeatableRead | Snapshot | Serializable |
 | ----------- | --------------- | ------------- | -------------- | -------- | ------------ |
-| PostgreSQL  | ✔️              | ✔️            | ✔️             | No       | ✔️           |
-| MySQL       | ✔️              | ✔️            | ✔️             | No       | ✔️           |
-| SQL Server  | ✔️              | ✔️            | ✔️             | ✔️       | ✔️           |
-| CockroachDB | No              | No            | No             | No       | ✔️           |
-| SQLite      | No              | No            | No             | No       | ✔️           |
+| PostgreSQL  | ✔️               | ✔️             | ✔️              | No       | ✔️            |
+| MySQL       | ✔️               | ✔️             | ✔️              | No       | ✔️            |
+| SQL Server  | ✔️               | ✔️             | ✔️              | ✔️        | ✔️            |
+| CockroachDB | No              | No            | No             | No       | ✔️            |
+| SQLite      | No              | No            | No             | No       | ✔️            |
 
 默认情况下，Prisma 客户端将隔离级别设置为数据库中当前配置的值。
 
@@ -5350,12 +5350,1929 @@ PrismaClient 支持以下批量查询：
 ## write your own SQL
 
 ### TypedSQL
+要开始在 Prisma 项目中使用 TypedSQL，请按照以下步骤操作：
+
+1. 确保您已安装 @prisma/client 和 prisma 并更新至至少版本 5.19.0。
+```CLI
+npm install @prisma/client@latest
+npm install -D prisma@latest
+```
+
+2. 将 typedSql 预览功能标志添加到您的 schema.prisma 文件中：
+```prisma
+generator client {
+  provider = "prisma-client-js"
+  previewFeatures = ["typedSql"]
+}
+```
+
+3. 在 prisma 目录中创建一个 sql 目录。您将在此处编写 SQL 查询。
+```CLI
+mkdir -p prisma/sql
+```
+
+4. 在 prisma/sql 目录中创建一个新的 .sql 文件。
+例如，getUsersWithPosts.sql。请注意，文件名必须是有效的 JS 标识符，并且不能以 $ 开头。
+
+5. 在新的 .sql 文件中写入 SQL 查询。
+例如：prisma/sql/getUsersWithPosts.sql
+```sql
+SELECT u.id, u.name, COUNT(p.id) as "postCount"
+FROM "User" u
+LEFT JOIN "Post" p ON u.id = p."authorId"
+GROUP BY u.id, u.name
+```
+
+6. 使用 sql 标志生成 Prisma 客户端，以确保为 SQL 查询创建 TypeScript 函数和类型：
+
+**WARNING:**
+*确保在使用 sql 标志生成客户端之前应用所有挂起的迁移。*
+```CLI
+prisma generate --sql
+```
+
+如果您不想在每次更改后重新生成客户端，此命令也适用于现有的 `--watch` 标志：
+```CLI
+prisma generate --sql --watch
+```
+
+7. 现在您可以在 TypeScript 代码中导入和使用 SQL 查询：
+```ts
+import { PrismaClient } from '@prisma/client'
+import { getUsersWithPosts } from '@prisma/client/sql'
+
+const prisma = new PrismaClient()
+
+const usersWithPostCounts = await prisma.$queryRawTyped(getUsersWithPosts())
+console.log(usersWithPostCounts)
+```
+
+#### 将参数传递给 TypedSQL 查询​
+要将参数传递给 TypedSQL 查询，您可以使用参数化查询。这允许您编写灵活且可重用的 SQL 语句，同时保持类型安全。操作方法如下：
+
+1. 在 SQL 文件中，对要传递的参数使用占位符。占位符的语法取决于您的数据库引擎：
+- 对于 PostgreSQL，使用位置占位符 $1、$2 等：
+```sql
+SELECT id, name, age
+FROM users
+WHERE age > $1 AND age < $2
+```
+
+- 对于 MySQL，使用位置占位符 ?：
+```sql
+SELECT id, name, age
+FROM users
+WHERE age > ? AND age < ?
+```
+
+- 在 SQLite 中，您可以使用许多不同的占位符。位置占位符（$1、$2 等）、一般占位符（?）和命名占位符（:minAge、:maxAge 等）均可用。对于此示例，我们将使用命名占位符 :minAge 和 :maxAge：
+```sql
+SELECT id, name, age
+FROM users
+WHERE age > :minAge AND age < :maxAge
+```
+
+2. 在 TypeScript 代码中使用生成的函数时，请将参数作为附加参数传递给 $queryRawTyped：
+```ts
+import { PrismaClient } from '@prisma/client'
+import { getUsersByAge } from '@prisma/client/sql'
+
+const prisma = new PrismaClient()
+
+const minAge = 18
+const maxAge = 30
+const users = await prisma.$queryRawTyped(getUsersByAge(minAge, maxAge))
+console.log(users)
+```
+通过使用参数化查询，您可以确保类型安全并防止 SQL 注入漏洞。 TypedSQL 生成器将根据您的 SQL 查询为参数创建适当的 TypeScript 类型，为查询结果和输入参数提供完整的类型检查。
+
+
+#### 将参数传递给 TypedSQL 查询​
+TypedSQL 支持将数组作为 PostgreSQL 的参数传递。将 PostgreSQL 的 ANY 运算符与数组参数结合使用。
+
+```sql
+SELECT id, name, email
+FROM users
+WHERE id = ANY($1)
+```
+
+```ts
+import { PrismaClient } from '@prisma/client'
+import { getUsersByIds } from '@prisma/client/sql'
+
+const prisma = new PrismaClient()
+
+const userIds = [1, 2, 3]
+const users = await prisma.$queryRawTyped(getUsersByIds(userIds))
+console.log(users)
+```
+TypedSQL 将为数组参数生成适当的 TypeScript 类型，确保输入和查询结果的类型安全。
+
+**NOTE:**
+*传递数组参数时，请注意数据库在单个查询中支持的占位符的最大数量。对于非常大的数组，您可能需要将查询拆分为多个较小的查询。*
+
+
+#### 在 SQL 文件中定义参数类型​
+TypedSQL 中的参数键入是通过 SQL 文件中的特定注释来完成的。这些评论的形式如下：
+```sql
+-- @param {Type} $N:alias optional description
+```
+
+其中 Type 是有效的数据库类型，N 是参数在查询中的位置，alias 是 TypeScript 类型中使用的参数的可选别名。
+当前接受的类型包括 Int、BigInt、Float、Boolean、String、DateTime、Json、Bytes 和 Decimal。
+例如，如果您需要输入带有别名和描述“用户名”的单个字符串参数，则可以将以下注释添加到 SQL 文件中：
+```sql
+-- @param {String} $1:name The name of the user
+```
+
+无论数据库引擎如何，参数类型定义的格式都是相同的。
+
+**NOTE:**
+*数组参数不支持手动参数类型定义。对于这些参数，您需要依赖 TypedSQL 提供的类型推断。*
+
+
+#### [示例](https://github.com/prisma/prisma-examples)
+
+#### TypedSQL 的局限性​
+
+
+##### 支持的数据库​
+TypedSQL 支持现代版本的 MySQL 和 PostgreSQL，无需任何进一步配置。对于 8.0 之前的 MySQL 版本和所有 SQLite 版本，您需要在 SQL 文件中手动描述参数类型。输入类型在 PostgreSQL 和 MySQL 8.0 及更高版本的所有受支持版本中推断。
+
+TypedSQL 不适用于 MongoDB，因为它是专门为 SQL 数据库设计的。
+
+##### 需要活动数据库连接
+TypedSQL 需要活动的数据库连接才能正常运行。这意味着您需要有一个正在运行的数据库实例，Prisma 在使用 --sql 标志生成客户端时可以连接到该实例。如果您的 Prisma 配置中提供了 directUrl，TypedSQL 将使用它进行连接。
+
+##### 带有动态列的动态 SQL 查询​
+TypedSQL 本身不支持使用动态添加的列构造 SQL 查询。当您需要创建在运行时确定列的查询时，必须使用 $queryRaw 和 $executeRaw 方法。这些方法允许执行原始 SQL，其中可以包括动态列选择。
+
+使用动态列选择的查询示例：
+```ts
+const columns = 'name, email, age'; // Columns determined at runtime
+const result = await prisma.$queryRawUnsafe(
+  `SELECT ${columns} FROM Users WHERE active = true`
+);
+```
+在此示例中，要选择的列是动态定义的并包含在 SQL 查询中。虽然这种方法提供了灵活性，但它需要仔细注意安全性，特别是避免 SQL 注入漏洞。此外，使用原始 SQL 查询意味着放弃 TypedSQL 的类型安全和 DX。
+
 
 ### Raw queries
+Prisma 客户端支持将原始查询发送到数据库的选项。
+如果出现以下情况，您可能希望使用原始查询：
+- 您想要运行高度优化的查询
+- 您需要 Prisma客户端 尚未支持的特性
+
+原始查询适用于 Prisma ORM 支持的所有关系数据库。此外，从版本 3.9.0 开始，MongoDB 支持原始查询。有关更多详细信息，请参阅相关部分：
+- [使用关系数据库的原始查询](https://www.prisma.io/docs/orm/prisma-client/using-raw-sql/raw-queries#raw-queries-with-relational-databases)
+- [使用 MongoDB 进行原始查询](https://www.prisma.io/docs/orm/prisma-client/using-raw-sql/raw-queries#raw-queries-with-mongodb)
+
+
+#### 在关系数据库中使用原始查询​
+对于关系数据库，Prisma Client 公开了四种允许您发送原始查询的方法。您可以使用：
+- `$queryRaw` 返回实际记录（例如，使用 `SELECT`）。
+- `$executeRaw` 返回受影响行的计数（例如，在 `UPDATE` 或 `DELETE` 之后）。
+- `$queryRawUnsafe` 使用原始字符串返回实际记录（例如，使用 `SELECT`）。
+- `$executeRawUnsafe` 使用原始字符串返回受影响行的计数（例如，在 `UPDATE` 或 `DELETE` 之后）。
+
+名称中带有“Unsafe”的方法更加灵活，但存在使代码容易受到 SQL 注入攻击的巨大风险。
+
+其他两种方法可以安全地使用简单的模板标记，无需构建字符串，也无需连接。但是，对于更复杂的用例需要谨慎，因为如果以某些方式使用这些方法，仍然可能引入 SQL 注入。有关更多详细信息，[请参阅下面的 SQL 注入预防部分](#sql-注入预防)。
+
+**NOTE:**
+*以上列表中的所有方法一次只能运行一个查询。您不能附加第二个查询 - 例如，使用 `select 1;select 2;` 将调用 `select 1` 查询， `select 2` 不会起作用。*
+
+##### `$queryRaw`
+`$queryRaw` 返回实际的数据库记录。
+例如，以下 SELECT 查询返回 User 表中每条记录的所有字段：
+```ts
+const result = await prisma.$queryRaw`SELECT * FROM User`;
+```
+
+该方法作为[tagged template](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Template_literals#tagged_templates)实现，它允许您传递模板文字，您可以在其中轻松插入变量。反过来，Prisma 客户端会创建免受 SQL 注入攻击的准备好的语句：
+```ts
+const email = "emelie@prisma.io";
+const result = await prisma.$queryRaw`SELECT * FROM User WHERE email = ${email}`;
+```
+
+您还可以使用 Prisma.sql 帮助器，事实上， $queryRaw 方法只接受模板字符串或 Prisma.sql 帮助器：
+```ts
+const email = "emelie@prisma.io";
+const result = await prisma.$queryRaw(Prisma.sql`SELECT * FROM User WHERE email = ${email}`);
+```
+**WARNING:**
+*如果您使用字符串构建将不受信任的输入合并到传递给此方法的查询中，那么您就有可能遭受 SQL 注入攻击。 SQL 注入攻击可能会使您的数据遭到修改或删除。首选机制是在运行此方法时包含查询文本。有关此风险的更多信息以及如何预防该风险的示例，请参阅下面的 SQL 注入预防部分。*
+
+**注意事项​:**
+- 模板变量不能在 SQL 字符串文字内使用。例如，以下查询将不起作用：
+```ts
+const name = "Bob";
+await prisma.$queryRaw`SELECT 'My name is ${name}';`;
+```
+
+- 相反，您可以将整个字符串作为变量传递，或使用字符串连接：
+```ts
+const name = "My name is Bob";
+await prisma.$queryRaw`SELECT ${name};`;
+```
+
+- 模板变量**只能用于数据值**（例如上例中的电子邮件）。**变量不能用于标识符**，例如列名、表名或数据库名，也不能用于 SQL 关键字。例如，以下两个查询将不起作用：
+```ts
+const myTable = "user";
+await prisma.$queryRaw`SELECT * FROM ${myTable};`;
+
+const ordering = "desc";
+await prisma.$queryRaw`SELECT * FROM Table ORDER BY ${ordering};`;
+```
+
+- Prisma 将 `$queryRaw` 和 `$queryRawUnsafe` 返回的任何数据库值映射到其相应的 JavaScript 类型。[了解更多](https://www.prisma.io/docs/orm/prisma-client/using-raw-sql/raw-queries#raw-query-type-mapping)
+
+- `$queryRaw` 不支持 PostgreSQL 数据库中的动态表名称。[了解更多](https://www.prisma.io/docs/orm/prisma-client/using-raw-sql/raw-queries#dynamic-table-names-in-postgresql)
+
+###### 返回类型​
+`$queryRaw` 返回一个数组。每个对象对应一条数据库记录：
+```ts
+[
+  { id: 1, email: "emelie@prisma.io", name: "Emelie" },
+  { id: 2, email: "yin@prisma.io", name: "Yin" },
+]
+```
+
+###### 签名
+```ts
+$queryRaw<T = unknown>(query: TemplateStringsArray | Prisma.Sql, ...values: any[]): PrismaPromise<T>;
+```
+
+###### 输入 $queryRaw 结果​
+PrismaPromise<T> 使用泛型类型参数T。您可以在调用 $queryRaw 方法时确定 T 的类型。在以下示例中，$queryRaw 返回 User[]：
+```ts
+// import the generated `User` type from the `@prisma/client` module
+import { User } from "@prisma/client";
+
+const result = await prisma.$queryRaw<User[]>`SELECT * FROM User`;
+// result is of type: `User[]`
+```
+**NOTE:**
+*注意：如果您不提供类型，$queryRaw 默认为未知。*
+
+如果您选择模型的特定字段或想要包含关系，[请参阅有关利用 Prisma Client 生成类型的文档](https://www.prisma.io/docs/orm/prisma-client/type-safety/operating-against-partial-structures-of-model-types#problem-using-variations-of-the-generated-model-type)（如果您想确保结果输入正确）。
+
+###### 使用原始 SQL 时的输入注意事项​
+当您键入 `$queryRaw` 的结果时，原始数据可能并不总是与建议的 TypeScript 类型匹配。例如，以下 Prisma 模型包含一个名为published 的布尔字段：
+```ts
+model Post {
+  id        Int     @id @default(autoincrement())
+  published Boolean @default(false)
+  title     String
+  content   String?
+}
+```
+以下查询返回所有帖子。然后它打印出每个帖子的已发布字段的值：
+```ts
+const result = await prisma.$queryRaw<Post[]>`SELECT * FROM Post`;
+
+result.forEach((x) => {
+  console.log(x.published);
+});
+```
+对于常规 CRUD 查询，Prisma 客户端查询引擎标准化了所有数据库的返回类型。使用原始查询则不会。如果数据库提供程序是 MySQL，则返回值为 1 或 0。但是，如果数据库提供程序是 PostgreSQL，则返回值为 true 或 false。
+
+###### PostgreSQL 中的动态表名称​
+无法插入表名称。这意味着您不能将动态表名称与 `$queryRaw` 一起使用。相反，您必须使用 `$queryRawUnsafe`，如下所示：
+请注意，如果将 $queryRawUnsafe 与用户输入结合使用，则会面临 SQL 注入攻击的风险。[了解更多](#sql-注入预防)
+
+##### `$queryRawUnsafe()`
+**WARNING:**
+*如果您将此方法与用户输入一起使用（换句话说，SELECT * FROM table WHERE columnx = ${userInput}），那么您就有可能遭受 SQL 注入攻击。 SQL 注入攻击可能会使您的数据遭到修改或删除。*
+*只要有可能，您应该使用 $queryRaw 方法。如果正确使用 $queryRaw 方法会明显更安全，但请注意，$queryRaw 方法在某些情况下也可能容易受到攻击。有关详细信息，[请参阅下面的 SQL 注入预防部分。](#sql-注入预防)*
+以下查询返回 User 表中每条记录的所有字段：
+```ts
+// import the generated `User` type from the `@prisma/client` module
+import { User } from "@prisma/client";
+
+const result = await prisma.$queryRawUnsafe("SELECT * FROM User");\
+```
+
+您还可以运行参数化查询。以下示例返回电子邮件包含字符串 emelie@prisma.io 的所有用户：
+```ts
+prisma.$queryRawUnsafe("SELECT * FROM users WHERE email = $1", "emelie@prisma.io");
+```
+[有关使用参数化查询的更多详细信息](https://www.prisma.io/docs/orm/prisma-client/using-raw-sql/raw-queries#parameterized-queries)
+
+###### 签名​
+```ts
+$queryRawUnsafe<T = unknown>(query: string, ...values: any[]): PrismaPromise<T>;
+```
+
+##### `$executeRaw`
+`$executeRaw` 返回受数据库操作（例如 UPDATE 或 DELETE）影响的行数。该函数不返回数据库记录。以下查询更新数据库中的记录并返回已更新的记录数：
+```ts
+const result: number =  await prisma.$executeRaw`UPDATE User SET active = true WHERE emailValidated = true`;
+```
+
+该方法作为 [tagged template](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Template_literals#tagged_templates) 实现，它允许您传递模板文字，您可以在其中轻松插入变量。反过来，Prisma 客户端会创建免受 SQL 注入攻击的准备好的语句：
+```ts
+const emailValidated = true;
+const active = true;
+
+const result: number = await prisma.$executeRaw`UPDATE User SET active = ${active} WHERE emailValidated = ${emailValidated};`;
+```
+
+###### 注意事项​
+- `$executeRaw` 不支持单个字符串中的多个查询（例如，同时执行 `ALTER TABLE` 和 `CREATE TABLE`）。
+- Prisma Client 提交准备好的语句，准备好的语句仅允许 SQL 语句的子集。
+例如，不允许 START TRANSACTION。[您可以在此处了解有关 MySQL 在准备语句中允许的语法的更多信息](https://dev.mysql.com/doc/refman/8.0/en/sql-prepared-statements.html)。
+- [PREPARE 不支持 ALTER](https://www.postgresql.org/docs/current/sql-prepare.html) - [请参阅解决方法](https://www.prisma.io/docs/orm/prisma-client/using-raw-sql/raw-queries#alter-limitation-postgresql)。
+- 模板变量不能在 SQL 字符串文字内使用。例如，以下查询将不起作用：
+```ts
+const name = "Bob";
+await prisma.$executeRaw`UPDATE user SET greeting = 'My name is ${name}';`;
+```
+相反，您可以将整个字符串作为变量传递，或使用字符串连接：
+```ts
+const name = "My name is Bob";
+await prisma.$executeRaw`UPDATE user SET greeting = ${name};`;
+const name = "Bob";
+await prisma.$executeRaw`UPDATE user SET greeting = 'My name is ' || ${name};`;
+```
+- 模板变量只能用于数据值（例如上例中的电子邮件）。变量不能用于标识符，例如列名、表名或数据库名，也不能用于 SQL 关键字。例如，以下两个查询将不起作用：
+```ts
+const myTable = "user";
+await prisma.$executeRaw`UPDATE ${myTable} SET active = true;`;
+
+const ordering = "desc";
+await prisma.$executeRaw`UPDATE User SET active = true ORDER BY ${desc};`;
+```
+
+###### 返回类型​
+`$executeRaw` 返回一个数字。
+
+###### 签名​
+```ts
+$executeRaw<T = unknown>(query: TemplateStringsArray | Prisma.Sql, ...values: any[]): PrismaPromise<number>;
+```
+
+##### `$executeRawUnsafe()​`
+`$executeRawUnsafe()` 方法允许您将原始字符串（或模板字符串）传递到数据库。与 `$executeRaw` 一样，它不返回数据库记录，而是返回受影响的行数。
+以下示例使用模板字符串来更新数据库中的记录。然后它返回已更新的记录数：
+```ts
+const emailValidated = true;
+const active = true;
+
+const result = await prisma.$executeRawUnsafe(
+  `UPDATE User SET active = ${active} WHERE emailValidated = ${emailValidated}`
+);
+```
+同样可以写成参数化查询：
+```ts
+const result = prisma.$executeRawUnsafe(
+  "UPDATE User SET active = $1 WHERE emailValidated = $2",
+  "yin@prisma.io",
+  true
+);
+```
+
+###### 签名​
+```ts
+$executeRawUnsafe<T = unknown>(query: string, ...values: any[]): PrismaPromise<number>;
+```
+
+
+###### 原始查询类型映射​
+Prisma 将 `$queryRaw` 和 `$queryRawUnsafe` 返回的任何数据库值映射到其相应的 JavaScript 类型。此行为与常规 Prisma 查询方法（如 `findMany()`）相同。
+下表显示了数据库中使用的类型与原始查询返回的 JavaScript 类型之间的转换：
+| Database type           | JavaScript type                |
+| ----------------------- | ------------------------------ |
+| Text                    | String                         |
+| 32-bit integer          | Number                         |
+| Floating point number   | Number                         |
+| Double precision number | Number                         |
+| 64-bit integer          | BigInt                         |
+| Decimal / numeric       | Decimal                        |
+| Bytes                   | Uint8Array (before v6: Buffer) |
+| Json                    | Object                         |
+| DateTime                | Date                           |
+| Date                    | Date                           |
+| Time                    | Date                           |
+| Uuid                    | String                         |
+| Xml                     | String                         |
+请注意，每种数据库类型的确切名称因数据库而异，例如，布尔类型在 PostgreSQL 中称为 boolean，在 CockroachDB 中称为 STRING。有关每个数据库的类型名称的完整详细信息，[请参阅标量类型参考](https://www.prisma.io/docs/orm/reference/prisma-schema-reference#model-field-scalar-types)。
+
+##### 原始查询类型转换行为​
+使用 Prisma Client 的原始查询可能要求参数采用 SQL 函数或查询的预期类型。 Prisma Client 不进行微妙的隐式转换。
+例如，使用 PostgreSQL 的 LENGTH 函数进行以下查询，该函数仅接受文本类型作为输入：
+```ts
+await prisma.$queryRaw`SELECT LENGTH(${42});`;
+```
+该查询返回一个错误：
+```
+// ERROR: function length(integer) does not exist
+// HINT: No function matches the given name and argument types. You might need to add explicit type casts.
+```
+这种情况下的解决方案是将 42 显式转换为文本类型：
+```ts
+await prisma.$queryRaw`SELECT LENGTH(${42}::text);`;
+```
+
+##### 交易​
+在 2.10.0 及更高版本中，您可以在事务内使用 `.$executeRaw()` 和 `.$queryRaw()`。
+
+##### 使用变量​
+`$executeRaw` 和 `$queryRaw` 被实现为 标记模板。标记模板是在 Prisma 客户端中使用原始 SQL 变量的推荐方法。
+以下示例包含名为 ${userId} 的占位符：
+```ts
+const userId = 42;
+const result = await prisma.$queryRaw`SELECT * FROM User WHERE id = ${userId};`;
+```
+使用 `$queryRaw` 和 `$executeRaw` 的标记模板版本的好处包括：
+- Prisma 客户端转义所有变量。
+- 标记模板与数据库无关 - 您不需要记住变量是否应该写为 $1 (PostgreSQL) 还是 ? （MySQL）。
+- [Tagged template helpers](https://www.prisma.io/docs/orm/prisma-client/using-raw-sql/raw-queries#tagged-template-helpers)
+- 嵌入式命名变量更易于阅读。
+**NOTE:**
+*您不能将表名或列名传递到模板字符串的占位符中。例如，您不能`select ?`并根据某些条件传入 `*` 或 `id、name`。*
+
+###### Tagged template helpers
+Prisma 客户端专门使用 SQL 模板标签 ，它公开了许多帮助程序。例如，以下查询使用 join() 传入 ID 列表：
+```ts
+import { Prisma } from "@prisma/client";
+
+const ids = [1, 3, 5, 10, 20];
+const result = await prisma.$queryRaw`SELECT * FROM User WHERE id IN (${Prisma.join(ids)})`;
+```
+
+以下示例使用`empty`和 `sql`helpers 根据userName是否为空来更改查询：
+```ts
+import { Prisma } from "@prisma/client";
+
+const userName = "";
+const result = await prisma.$queryRaw`SELECT * FROM User ${
+  userName ? Prisma.sql`WHERE name = ${userName}` : Prisma.empty // Cannot use "" or NULL here!
+}`;
+```
+
+###### ALTER 限制 (PostgreSQL)​
+PostgreSQL 不支持在准备好的语句中使用ALTER，这意味着以下查询将不起作用：
+```ts
+await prisma.$executeRaw`ALTER USER prisma WITH PASSWORD "${password}"`;
+await prisma.$executeRaw(Prisma.sql`ALTER USER prisma WITH PASSWORD "${password}"`);
+```
+
+您可以使用以下查询，但请注意，这可能不安全，因为 `${password}` 未转义：
+```ts
+await prisma.$executeRawUnsafe('ALTER USER prisma WITH PASSWORD "$1"', password})
+```
+
+##### 不支持的类型​
+不支持的类型需要先转换为 Prisma 客户端支持的类型，然后才能在 $queryRaw 或 $queryRawUnsafe 中使用它们。例如，采用以下模型，其中有一个类型为“不支持”的位置字段：
+```prisma
+model Country {
+  location  Unsupported("point")?
+}
+```
+对于不受支持的字段，以下查询将不起作用：
+```ts
+await prisma.$queryRaw`SELECT location FROM Country;`;
+```
+相反，如果您的“不支持”列支持转换，请将“不支持”字段转换为任何支持的 Prisma 客户端类型。
+您可能希望将 Unsupported 列转换为的最常见类型是 String。例如，在 PostgreSQL 上，这将映射到文本类型：
+```ts
+await prisma.$queryRaw`SELECT location::text FROM Country;`;
+```
+因此，数据库将提供 Prisma 客户端支持的数据的字符串表示形式。
+有关支持的 Prisma 类型的详细信息，[请参阅相关数据库的 Prisma 连接器概述](https://www.prisma.io/docs/orm/overview/databases)。
+
+#### SQL 注入预防
+在 Prisma Client 中避免 SQL 注入的理想方法是尽可能使用 ORM 模型执行查询。
+
+##### 在 `$queryRaw` 和 `$executeRaw` ​中
+
+###### 简单、安全地使用 `$queryRaw` 和 `$executeRaw​`
+当您使用标记模板并将所有查询作为准备好的语句发送时，这些方法可以通过转义所有变量来降低 SQL 注入的风险。
+```ts
+$queryRaw`...`; // Tagged template
+$executeRaw`...`; // Tagged template
+```
+
+###### 不安全地使用 `$queryRaw` 和 `$executeRaw​`
+然而，也有可能以不安全的方式使用这些方法。
+一种方法是人为生成标记模板，该模板不安全地连接用户输入。
+以下示例容易受到 SQL 注入攻击：
+```ts
+// Unsafely generate query text
+const inputString = `'Sarah' UNION SELECT id, title FROM "Post"`; // SQL Injection
+const query = `SELECT id, name FROM "User" WHERE name = ${inputString}`;
+
+// Version for Typescript
+const stringsArray: any = [...[query]];
+
+// Version for Javascript
+const stringsArray = [...[query]];
+
+// Use the `raw` property to impersonate a tagged template
+stringsArray.raw = [query];
+
+// Use queryRaw
+const result = await prisma.$queryRaw(stringsArray);
+console.log(result);
+```
+容易受到攻击的另一种方法是滥用 Prisma.raw 函数。
+以下示例都容易受到 SQL 注入攻击：
+```ts
+const inputString = `'Sarah' UNION SELECT id, title FROM "Post"`;
+const result = await prisma.$queryRaw`SELECT id, name FROM "User" WHERE name = ${Prisma.raw(
+  inputString
+)}`;
+console.log(result);
+
+const inputString = `'Sarah' UNION SELECT id, title FROM "Post"`;
+const result = await prisma.$queryRaw(
+  Prisma.raw(`SELECT id, name FROM "User" WHERE name = ${inputString}`)
+);
+console.log(result);
+
+const inputString = `'Sarah' UNION SELECT id, title FROM "Post"`;
+const query = Prisma.raw(`SELECT id, name FROM "User" WHERE name = ${inputString}`);
+const result = await prisma.$queryRaw(query);
+console.log(result);
+```
+
+###### 在更复杂的场景中安全地使用 `$queryRaw` 和 `$executeRaw​`
+
+- **构建与查询执行分开的原始查询​**
+如果您想在其他地方构建原始查询或与参数分开，则需要使用以下方法之一。
+在此示例中，sql 帮助程序方法用于通过安全地包含变量来构建查询文本。它对于 SQL 注入是安全的：
+
+```ts
+// inputString can be untrusted input
+const inputString = `'Sarah' UNION SELECT id, title FROM "Post"`;
+
+// Safe if the text query below is completely trusted content
+const query = Prisma.sql`SELECT id, name FROM "User" WHERE name = ${inputString}`;
+
+const result = await prisma.$queryRaw(query);
+console.log(result);
+```
+
+在此示例中，可以安全地避免 SQL 注入，sql 辅助方法用于构建查询文本，其中包括输入值的参数标记。每个变量都由一个标记符号表示（对于 MySQL 为 ?，对于 PostgreSQL 为 $1、$2 等）。请注意，这些示例仅显示 PostgreSQL 查询。
+```ts
+// Version for Typescript
+const query: any;
+
+// Version for Javascript
+const query;
+
+// Safe if the text query below is completely trusted content
+query = Prisma.sql`SELECT id, name FROM "User" WHERE name = $1`;
+
+// inputString can be untrusted input
+const inputString = `'Sarah' UNION SELECT id, title FROM "Post"`;
+query.values = [inputString];
+
+const result = await prisma.$queryRaw(query);
+console.log(result);
+```
+
+- **在其他地方或分阶段构建原始查询​**
+如果您想在执行查询的地方以外的地方构建原始查询，则理想的方法是从查询段创建一个 Sql 对象并向其传递参数值。
+
+在下面的示例中，我们有两个要参数化的变量。只要传递给 Prisma.sql 的查询字符串仅包含可信内容，该示例就可以安全地防止 SQL 注入：
+```ts
+// Example is safe if the text query below is completely trusted content
+const query1 = `SELECT id, name FROM "User" WHERE name = `; // The first parameter would be inserted after this string
+const query2 = ` OR name = `; // The second parameter would be inserted after this string
+
+const inputString1 = "Fred";
+const inputString2 = `'Sarah' UNION SELECT id, title FROM "Post"`;
+
+const query = Prisma.sql([query1, query2, ""], inputString1, inputString2);
+const result = await prisma.$queryRaw(query);
+console.log(result);
+```
+**NOTE:**
+*请注意，作为第一个参数传递的字符串数组 Prisma.sql 需要在末尾有一个空字符串，因为 sql 函数期望比参数数量多一个查询段。*
+
+如果您想将原始查询构建为一个大字符串，这仍然是可能的，但需要小心，因为它使用潜在危险的 Prisma.raw 方法。您还需要使用数据库的正确参数标记构建查询，因为 Prisma 无法像通常那样为相关数据库提供标记。
+
+只要传递到 Prisma.raw 的查询字符串仅包含可信内容，以下示例就可以安全地防止 SQL 注入：
+```ts
+// Version for Typescript
+const query: any;
+
+// Version for Javascript
+const query;
+
+// Example is safe if the text query below is completely trusted content
+const query1 = `SELECT id, name FROM "User" `;
+const query2 = `WHERE name = $1 `;
+
+query = Prisma.raw(`${query1}${query2}`);
+
+// inputString can be untrusted input
+const inputString = `'Sarah' UNION SELECT id, title FROM "Post"`;
+query.values = [inputString];
+
+const result = await prisma.$queryRaw(query);
+console.log(result);
+```
+
+
+
+##### 在 `$queryRawUnsafe` 和 `$executeRawUnsafe` 中​
+
+###### 不安全地使用 `$queryRawUnsafe` 和 `$executeRawUnsafe​`
+如果您无法使用标记模板，则可以使用 $queryRawUnsafe 或 $executeRawUnsafe。但是，请注意，这些函数会显着增加代码中 SQL 注入漏洞的风险。
+以下示例连接 query 和 inputString。 Prisma Client 在本例中无法转义 inputString，这使得它容易受到 SQL 注入的攻击：
+```ts
+const inputString = '"Sarah" UNION SELECT id, title, content FROM Post'; // SQL Injection
+const query = "SELECT id, name, email FROM User WHERE name = " + inputString;
+const result = await prisma.$queryRawUnsafe(query);
+
+console.log(result);
+```
+
+###### 参数化查询​
+作为标记模板的替代方案，`$queryRawUnsafe` 支持标准参数化查询，其中每个变量都由一个符号表示（对于 MySQL 使用 `?`，对于 PostgreSQL 使用 `$1、$2` 等, 以此类推）。请注意，这些示例仅显示 PostgreSQL 查询。
+以下示例对于 SQL 注入是安全的：
+```ts
+const userName = "Sarah";
+const email = "sarah@prisma.io";
+const result = await prisma.$queryRawUnsafe(
+  "SELECT * FROM User WHERE (name = $1 OR email = $2)",
+  userName,
+  email
+);
+```
+与标记模板一样，Prisma Client 会转义以这种方式提供的所有变量。
+**NOTE:**
+*您不能将表名或列名作为变量传递到参数化查询中。例如，您不能`SELECT ?`并根据某些条件传入 `*` 或 `id、name`。*
+
+**参数化 PostgreSQL ILIKE 查询​**
+当您使用 `ILIKE` 时，`%` 通配符应包含在变量本身中，而不是查询（字符串）中。此示例对于 SQL 注入是安全的。
+
+```ts
+const userName = "Sarah";
+const emailFragment = "prisma.io";
+const result = await prisma.$queryRawUnsafe(
+  'SELECT * FROM "User" WHERE (name = $1 OR email ILIKE $2)',
+  userName,
+  `%${emailFragment}`
+);
+```
+**NOTE:**
+*使用 %$2 作为参数是行不通的*
+
+
+#### 在MongoDB中使用原始查询​
+`$runCommandRaw()`针对数据库运行原始 MongoDB 命令。作为输入，它接受所有 MongoDB 数据库命令，但以下例外：
+- `find`（使用 `findRaw()` 代替）
+- `aggregate`（使用`aggregateRaw()`代替）
+
+当您使用 `$runCommandRaw()` 运行 MongoDB 数据库命令时，请注意以下事项：
+- 调用 `$runCommandRaw()` 时传递的对象必须遵循 MongoDB 数据库命令的语法。
+- 您必须使用 MongoDB 数据库命令的适当角色连接到数据库。
+
+在以下示例中，查询插入具有相同 _id 的两条记录。这绕过了正常的文档验证。
+```ts
+prisma.$runCommandRaw({
+  insert: "Pets",
+  bypassDocumentValidation: true,
+  documents: [
+    {
+      _id: 1,
+      name: "Felinecitas",
+      type: "Cat",
+      breed: "Russian Blue",
+      age: 12,
+    },
+    {
+      _id: 1,
+      name: "Nao Nao",
+      type: "Dog",
+      breed: "Chow Chow",
+      age: 2,
+    },
+  ],
+});
+```
+
+**WARNING:**
+不要将 `$runCommandRaw()` 用于包含“find”或“aggregate”命令的查询，因为您可能无法获取所有数据。这是因为 MongoDB 返回一个附加到您的 MongoDB 会话的游标
+，并且您可能不会每次都点击相同的 MongoDB 会话。对于这些查询，您应该使用专门的 `findRaw()` 和 `aggregateRaw()` 方法。
+
+##### 返回类型​
+`$runCommandRaw()` 返回一个 JSON 对象，其形状取决于输入。
+
+##### 签名​
+```ts
+$runCommandRaw(command: InputJsonObject): PrismaPromise<JsonObject>;
+```
+
+#### findRaw()
+`<model>.findRaw()` 返回实际的数据库记录。它将找到零个或多个与 User 集合上的过滤器匹配的文档：
+```ts
+const result = await prisma.user.findRaw({
+  filter: { age: { $gt: 25 } },
+  options: { projection: { _id: false } },
+});
+```
+
+##### 返回类型​
+`<model>.findRaw()`返回一个 JSON 对象，其形状取决于输入。
+
+##### 签名​
+```ts
+<model>.findRaw(args?: {filter?: InputJsonObject, options?: InputJsonObject}): PrismaPromise<JsonObject>;
+```
+- `filter`：[查询过滤器](https://www.mongodb.com/zh-cn/docs/manual/reference/operator/query/)。如果没有指定，那么所有文档都会被匹配。
+- `options`：额外的选项去跳过 `find` 命令
+
+#### aggregateRaw()
+`<model>.aggregateRaw()` 返回聚合的数据库记录。它将对 User 集合执行聚合操作：
+```ts
+const result = await prisma.user.aggregateRaw({
+  pipeline: [
+    { $match: { status: "registered" } },
+    { $group: { _id: "$country", total: { $sum: 1 } } },
+  ],
+});
+```
+
+##### 返回类型​
+`<model>.aggregateRaw()`返回一个 JSON 对象，其形状取决于输入。
+
+##### 签名​
+```ts
+<model>.aggregateRaw(args?: {pipeline?: InputJsonObject[], options?: InputJsonObject}): PrismaPromise<JsonObject>;
+```
+- `pipeline`：一个在聚合阶段经由[aggregation pipeline](https://www.mongodb.com/zh-cn/docs/manual/reference/operator/aggregation-pipeline/)去处理和转换文档流的数组。
+- `options`：额外的选项去跳过 `aggregate` 命令
+
 
 ### SafeQL & Prisma Client
 
+#### 什么是 SafeQL？​
+SafeQL允许在原始 SQL 查询中实现高级 linting 和类型安全。设置后，SafeQL 与 Prisma 客户端 $queryRaw 和 $executeRaw 配合使用，在需要原始查询时提供类型安全。
+SafeQL 作为 [ESLint](https://eslint.org/) 插件运行，并使用 ESLint 规则进行配置。本指南不包括设置 ESLint，我们假设您已经在项目中运行了它。
+
+#### 先决条件​
+- 一个安装了 PostGIS 的 PostgreSQL 数据库
+- 在您的项目中设置 Prisma ORM
+- 在您的项目中设置 ESLint
+
+#### Prisma ORM 中的地理数据支持​
+在撰写本文时，Prisma ORM 不支持处理地理数据，特别是使用 PostGIS。
+具有地理数据列的模型将使用[不受支持的](https://www.prisma.io/docs/orm/reference/prisma-schema-reference#unsupported)数据类型进行存储。生成的 Prisma 客户端中存在类型不受支持的字段，将设置为`any`类型。具有必需的 `Unsupported` 类型的模型不会公开`create`和`update`等写入操作。
+Prisma 客户端支持使用 `$queryRaw` 和 `$executeRaw` 对具有必需的不支持字段的模型进行写入操作。在原始查询中处理地理数据时，您可以使用 Prisma 客户端扩展和 SafeQL 来提高类型安全性。
+
+
+#### 1. 设置 Prisma ORM 以与 PostGIS 一起使用
+如果您还没有启用 postgresqlExtensions Preview 功能，并在您的 Prisma 模式中添加 postgis PostgreSQL 扩展：
+```prisma
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [postgis]
+}
+```
+**WARNING:**
+*如果您不使用托管数据库提供商，则可能需要安装 postgis 扩展。[请参阅 PostGIS 的文档](http://postgis.net/documentation/getting_started/#installing-postgis)以了解有关如何开始使用 PostGIS 的更多信息。如果您使用 Docker Compose，则可以使用以下代码片段来设置安装了 PostGIS 的 PostgreSQL 数据库：*
+```Docker
+version: '3.6'
+services:
+  pgDB:
+    image: postgis/postgis:13-3.1-alpine
+    restart: always
+    ports:
+      - '5432:5432'
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: geoexample
+volumes:
+  db_data:
+```
+
+接下来，创建迁移并执行迁移以启用扩展：
+```CLI
+npx prisma migrate dev --name add-postgis
+```
+
+作为参考，迁移文件的输出应如下所示：
+```SQL
+-- CreateExtension
+CREATE EXTENSION IF NOT EXISTS "postgis";
+```
+您可以通过运行 `prisma migrate status` 来仔细检查迁移是否已应用。
+
+#### 2. 创建一个使用地理数据列的新模型​
+应用迁移后，添加一个新模型，其中包含具有地理数据类型的列。在本指南中，我们将使用名为 PointOfInterest 的模型。
+```prisma
+model PointOfInterest {
+  id       Int                                   @id @default(autoincrement())
+  name     String
+  location Unsupported("geography(Point, 4326)")
+}
+```
+您会注意到位置字段使用不支持的类型。这意味着我们在使用 PointOfInterest 时失去了 Prisma ORM 的很多好处。我们将使用 SafeQL 来解决此问题。
+
+与之前一样，使用 prisma migrate dev 命令创建并执行迁移，以在数据库中创建 PointOfInterest 表：
+```cli
+npx prisma migrate dev --name add-poi
+```
+
+作为参考，以下是 Prisma Migrate 生成的 SQL 迁移文件的输出：
+```sql
+-- CreateTable
+CREATE TABLE "PointOfInterest" (
+    "id" SERIAL NOT NULL,
+    "name" TEXT NOT NULL,
+    "location" geography(Point, 4326) NOT NULL,
+
+    CONSTRAINT "PointOfInterest_pkey" PRIMARY KEY ("id")
+);
+```
+
+#### 3. 集成 SafeQL​
+SafeQL 可轻松与 Prisma ORM 集成，以便检查 $queryRaw 和 $executeRaw Prisma 操作。您可以[参考 SafeQL 的集成指南](https://safeql.dev/compatibility/prisma.html)或按照以下步骤操作。
+
+1. 安装 `@ts-safeql/eslint-plugin` npm 包​
+```cli
+npm install -D @ts-safeql/eslint-plugin
+```
+
+2. 将 `@ts-safeql/eslint-plugin` 添加到您的 ESLint 插件​
+接下来，将 `@ts-safeql/eslint-plugin` 添加到 ESLint 插件列表中。在我们的示例中，我们使用 .eslintrc.js 文件，但这可以应用于配置 ESLint的任何方式。
+```js
+// .eslintrc.js
+/** @type {import('eslint').Linter.Config} */
+module.exports = {
+  "plugins": [..., "@ts-safeql/eslint-plugin"],
+  ...
+}
+```
+
+3. 添加`@ts-safeql/check-sql`规则​
+现在，设置规则，使 SafeQL 能够将无效的 SQL 查询标记为 ESLint 错误。
+```js
+// .eslintrc.js
+/** @type {import('eslint').Linter.Config} */
+module.exports = {
+  plugins: [..., '@ts-safeql/eslint-plugin'],
+  rules: {
+    '@ts-safeql/check-sql': [
+      'error',
+      {
+        connections: [
+          {
+            // The migrations path:
+            migrationsDir: './prisma/migrations',
+            targets: [
+              // This makes `prisma.$queryRaw` and `prisma.$executeRaw` commands linted
+              { tag: 'prisma.+($queryRaw|$executeRaw)', transform: '{type}[]' },
+            ],
+          },
+        ],
+      },
+    ],
+  },
+}
+```
+**NOTE:**
+*注意：如果您的 `PrismaClient` 实例的名称与 `prisma` 不同，您需要相应地调整 `tag` 的值。例如，如果名为 `db`，则 `tag` 的值应为 `db.+($queryRaw|$executeRaw)`。*
+
+4. 连接到您的数据库​
+最后，为 SafeQL 设置一个 `connectionUrl`，以便它可以内省您的数据库并检索您在架构中使用的表和列名称。然后，SafeQL 使用此信息来检查和突出显示原始 SQL 语句中的问题。
+
+我们的示例依赖于 `dotenv` 包来获取 Prisma ORM 使用的相同连接字符串。我们建议这样做是为了使您的数据库 URL 不受版本控制。
+
+如果你还没有安装`dotenv`，可以按如下方式安装：
+```cli
+npm install dotenv
+```
+
+然后更新您的 ESLint 配置，如下所示：
+```js
+// .eslintrc.js
+require('dotenv').config()
+
+/** @type {import('eslint').Linter.Config} */
+module.exports = {
+  plugins: ['@ts-safeql/eslint-plugin'],
+  // exclude `parserOptions` if you are not using TypeScript
+  parserOptions: {
+    project: './tsconfig.json',
+  },
+  rules: {
+    '@ts-safeql/check-sql': [
+      'error',
+      {
+        connections: [
+          {
+            connectionUrl: process.env.DATABASE_URL,
+            // The migrations path:
+            migrationsDir: './prisma/migrations',
+            targets: [
+              // what you would like SafeQL to lint. This makes `prisma.$queryRaw` and `prisma.$executeRaw`
+              // commands linted
+              { tag: 'prisma.+($queryRaw|$executeRaw)', transform: '{type}[]' },
+            ],
+          },
+        ],
+      },
+    ],
+  },
+}
+```
+
+SafeQL 现已完全配置，可帮助您使用 Prisma Client 编写更好的原始 SQL。
+
+#### 4. 创建扩展以使原始 SQL 查询类型安全​
+
+1. 添加扩展以创建 `PointOfInterest` 记录​
+Prisma 架构中的 PointOfInterest 模型使用`Unsupported`的类型。因此，Prisma 客户端中生成的 PointOfInterest 类型不能用于携带纬度和经度值。
+我们将通过定义两个自定义类型来解决这个问题，它们可以更好地在 TypeScript 中表示我们的模型：
+```ts
+type MyPoint = {
+  latitude: number
+  longitude: number
+}
+
+type MyPointOfInterest = {
+  name: string
+  location: MyPoint
+}
+```
+
+接下来，您可以将`create`查询添加到 Prisma 客户端的 `pointOfInterest` 属性：
+```ts
+const prisma = new PrismaClient().$extends({
+  model: {
+    pointOfInterest: {
+      async create(data: {
+        name: string
+        latitude: number
+        longitude: number
+      }) {
+        // Create an object using the custom types from above
+        const poi: MyPointOfInterest = {
+          name: data.name,
+          location: {
+            latitude: data.latitude,
+            longitude: data.longitude,
+          },
+        }
+
+        // Insert the object into the database
+        const point = `POINT(${poi.location.longitude} ${poi.location.latitude})`
+        await prisma.$queryRaw`
+          INSERT INTO "PointOfInterest" (name, location) VALUES (${poi.name}, ST_GeomFromText(${point}, 4326));
+        `
+
+        // Return the object
+        return poi
+      },
+    },
+  },
+})
+```
+请注意，代码片段中突出显示的行中的 SQL 已由 SafeQL 检查！例如，如果将表名称从“PointOfInterest”更改为“PointOfInterest2”，则会出现以下错误：
+```
+error  Invalid Query: relation "PointOfInterest2" does not exist  @ts-safeql/check-sql
+```
+这也适用于列名 `name` 和 `location`。
+
+您现在可以在代码中创建新的 PointOfInterest 记录，如下所示：
+```ts
+const poi = await prisma.pointOfInterest.create({
+  name: 'Berlin',
+  latitude: 52.52,
+  longitude: 13.405,
+})
+```
+
+2. 添加扩展来查询最接近的 `PointOfInterest` 记录​
+现在让我们创建一个 Prisma 客户端扩展来查询该模型。我们将进行扩展，找到距离给定经度和纬度最近的兴趣点。
+```ts
+const prisma = new PrismaClient().$extends({
+  model: {
+    pointOfInterest: {
+      async create(data: {
+        name: string
+        latitude: number
+        longitude: number
+      }) {
+        // ... same code as before
+      },
+
+      async findClosestPoints(latitude: number, longitude: number) {
+        // Query for clostest points of interests
+        const result = await prisma.$queryRaw<
+          {
+            id: number | null
+            name: string | null
+            st_x: number | null
+            st_y: number | null
+          }[]
+        >`SELECT id, name, ST_X(location::geometry), ST_Y(location::geometry) 
+            FROM "PointOfInterest" 
+            ORDER BY ST_DistanceSphere(location::geometry, ST_MakePoint(${longitude}, ${latitude})) DESC`
+
+        // Transform to our custom type
+        const pois: MyPointOfInterest[] = result.map((data) => {
+          return {
+            name: data.name,
+            location: {
+              latitude: data.st_x || 0,
+              longitude: data.st_y || 0,
+            },
+          }
+        })
+
+        // Return data
+        return pois
+      },
+    },
+  },
+})
+```
+现在，您可以正常使用我们的 Prisma 客户端，使用在 PointOfInterest 模型上创建的自定义方法来查找给定经度和纬度的附近兴趣点。
+```ts
+const closestPointOfInterest = await prisma.pointOfInterest.findClosestPoints(
+  53.5488,
+  9.9872
+)
+```
+与之前类似，我们再次受益于 SafeQL 为我们的原始查询添加额外的类型安全性。例如，如果我们通过将 location::geometry 更改为仅 location 来删除对位置的几何转换，我们将分别在 ST_X、ST_Y 或 ST_DistanceSphere 函数中出现 linting 错误。
+```
+error  Invalid Query: function st_distancesphere(geography, geometry) does not exist  @ts-safeql/check-sql
+```
+
 ## fields & types
+
+- **使用 Decimal**
+小数字段由 [Decimal.js 库](https://mikemcl.github.io/decimal.js/) 表示。以下示例演示了如何导入和使用 Prisma.Decimal：
+```ts
+import { PrismaClient, Prisma } from '@prisma/client'
+
+const newTypes = await prisma.sample.create({
+  data: {
+    cost: new Prisma.Decimal(24.454545),
+  },
+})
+```
+**INFO:**
+*MongoDB 目前不支持使用 Decimal 字段。*
+
+
+- **使用 BigInt**
+BigInt 字段由 BigInt 类型表示（需要 Node.js 10.4.0+）。以下示例演示了如何使用 BigInt 类型：
+```ts
+import { PrismaClient, Prisma } from '@prisma/client'
+
+const newTypes = await prisma.sample.create({
+  data: {
+    revenue: BigInt(534543543534),
+  },
+})
+```
+
+序列化 BigInt​
+Prisma 客户端以纯 JavaScript 对象的形式返回记录。如果您尝试对包含 BigInt 字段的对象使用 JSON.stringify，您将看到以下错误：
+```
+Do not know how to serialize a BigInt
+```
+要解决此问题，请使用 JSON.stringify 的自定义实现：
+```ts
+JSON.stringify(
+  this,
+  (key, value) => (typeof value === 'bigint' ? value.toString() : value) // return everything else unchanged
+)
+```
+
+- **使用 Bytes**
+字节字段由 Uint8Array 类型表示。以下示例演示了如何使用 Uint8Array 类型：
+```ts
+import { PrismaClient, Prisma } from '@prisma/client'
+
+const newTypes = await prisma.sample.create({
+  data: {
+    myField: new Uint8Array([1, 2, 3, 4]),
+  },
+})
+```
+
+请注意，在 Prisma v6 之前，字节由 Buffer 类型表示：
+```ts
+import { PrismaClient, Prisma } from '@prisma/client'
+
+const newTypes = await prisma.sample.create({
+  data: {
+    myField: Buffer.from([1, 2, 3, 4]),
+  },
+})
+```
+
+- [**使用 Json**](https://www.prisma.io/docs/orm/prisma-client/special-fields-and-types/working-with-json-fields)
+
+- [**使用 标量 lists/标量 arrays**](https://www.prisma.io/docs/orm/prisma-client/special-fields-and-types/working-with-scalar-lists-arrays)
+
+- [**使用复合 ID 和复合唯一约束**​](https://www.prisma.io/docs/orm/prisma-client/special-fields-and-types/working-with-composite-ids-and-constraints)
+
+
+### 复合类型
+
+复合类型（在 MongoDB 中称为嵌入文档）允许您将记录嵌入到其他记录中。
+
+我们将在下面的示例中使用此架构：
+```prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+model Product {
+  id     String  @id @default(auto()) @map("_id") @db.ObjectId
+  name   String  @unique
+  price  Float
+  colors Color[]
+  sizes  Size[]
+  photos Photo[]
+  orders Order[]
+}
+
+model Order {
+  id              String   @id @default(auto()) @map("_id") @db.ObjectId
+  product         Product  @relation(fields: [productId], references: [id])
+  color           Color
+  size            Size
+  shippingAddress Address
+  billingAddress  Address?
+  productId       String   @db.ObjectId
+}
+
+enum Color {
+  Red
+  Green
+  Blue
+}
+
+enum Size {
+  Small
+  Medium
+  Large
+  XLarge
+}
+
+type Photo {
+  height Int    @default(200)
+  width  Int    @default(100)
+  url    String
+}
+
+type Address {
+  street String
+  city   String
+  zip    String
+}
+```
+在此架构中，Product 模型具有 Photo[] 复合类型，Order 模型具有两个复合 Address 类型。 ShippingAddress 是必需的，但 billingAddress 是可选的。
+
+#### 使用复合类型时的注意事项​
+目前在 Prisma Client 中使用复合类型时存在一些限制：
+- `findUnique()` 无法过滤复合类型
+- `aggregate`、`groupBy()`、`count` 不支持复合运算
+
+#### 复合类型必填字段的默认值​
+从版本 4.0.0 开始，如果在满足以下所有条件时对复合类型执行数据库读取，则 Prisma 客户端会将默认值插入到结果中。
+- 复合类型上的字段是必需的，
+- 该字段有一个默认值，
+- 返回的一个或多个文档中不存在该字段。
+
+Note:
+- 这与模型字段的行为相同。
+- 在读取操作中，Prisma 客户端将默认值插入到结果中，但不会将默认值插入到数据库中。
+
+在我们的示例架构中，假设您向照片添加必填字段。该字段 bitDepth 有一个默认值：
+```prisma
+...
+type Photo {
+  ...
+  bitDepth Int @default(8)
+}
+
+...
+```
+
+假设您随后运行 `npx prisma db Push` 来更新数据库并使用 `npx prismagenerate` 重新生成 Prisma 客户端。然后，运行以下应用程序代码：
+```ts
+console.dir(await prisma.product.findMany({}), { depth: Infinity })
+```
+bitDepth字段没有内容，因为您刚刚添加了该字段，所以查询返回默认值8。
+
+#### 使用 find 和 findMany 查找包含复合类型的记录​
+可以通过 `where` 操作中的复合类型来过滤记录。
+
+##### 过滤一种复合类型​
+使用 `is`、`equals`、`isNot` 和 `isSet` 操作来更改单个复合类型：
+- `is`：通过匹配复合类型来过滤结果。需要存在一个或多个字段（例如，按送货地址上的街道名称过滤订单）
+- `equals`：通过匹配复合类型来过滤结果。要求所有字段都存在。 （例如，按完整送货地址过滤订单）
+- `isNot`：按不匹配的复合类型过滤结果
+- `isSet` ：过滤可选字段以仅包含已设置的结果（设置为值或显式设置为 null）。将此过滤器设置为 true 将排除根本未设置的未定义结果。
+
+例如，使用 `is` 过滤街道名称为“555 Candy Cane Lane”的订单：
+```ts
+const orders = await prisma.order.findMany({
+  where: {
+    shippingAddress: {
+      is: {
+        street: '555 Candy Cane Lane',
+      },
+    },
+  },
+})
+```
+
+使用 `equals` 过滤与送货地址中所有字段匹配的订单：
+```ts
+const orders = await prisma.order.findMany({
+  where: {
+    shippingAddress: {
+      equals: {
+        street: '555 Candy Cane Lane',
+        city: 'Wonderland',
+        zip: '52337',
+      },
+    },
+  },
+})
+```
+
+您还可以对此查询使用简写符号，其中省略等于：
+```ts
+const orders = await prisma.order.findMany({
+  where: {
+    shippingAddress: {
+      street: '555 Candy Cane Lane',
+      city: 'Wonderland',
+      zip: '52337',
+    },
+  },
+})
+```
+
+使用 `isNot` 过滤邮政编码不为“52337”的订单：
+```ts
+const orders = await prisma.order.findMany({
+  where: {
+    shippingAddress: {
+      isNot: {
+        zip: '52337',
+      },
+    },
+  },
+})
+```
+
+使用 `isSet` 过滤已设置可选 billingAddress（为某个值或为 null）的订单：
+```ts
+const orders = await prisma.order.findMany({
+  where: {
+    billingAddress: {
+      isSet: true,
+    },
+  },
+})
+```
+
+##### 过滤多种复合类型​
+使用 `equals`、`isEmpty`、`every`、`some` 和 `none` 操作来过滤多个复合类型：
+- `equals`：检查列表的完全相等性
+- `isEmpty`：检查列表是否为空
+- `every`：列表中的每一项都必须符合条件
+- `some`：列表中的一项或多项必须符合条件
+- `none`：列表中没有任何项目可以匹配条件
+- `isSet`：过滤可选字段以仅包含已设置的结果（设置为值或显式设置为 null）。将此过滤器设置为 true 将排除根本未设置的未定义结果。
+
+例如，您可以使用 `equals` 查找具有特定照片列表的产品（所有 url、高度和宽度字段必须匹配）：
+```ts
+const product = prisma.product.findMany({
+  where: {
+    photos: {
+      equals: [
+        {
+          url: '1.jpg',
+          height: 200,
+          width: 100,
+        },
+        {
+          url: '2.jpg',
+          height: 200,
+          width: 100,
+        },
+      ],
+    },
+  },
+})
+```
+
+您还可以为此查询使用简写符号，其中省略等于并仅指定要过滤的字段：
+```ts
+const product = prisma.product.findMany({
+  where: {
+    photos: [
+      {
+        url: '1.jpg',
+        height: 200,
+        width: 100,
+      },
+      {
+        url: '2.jpg',
+        height: 200,
+        width: 100,
+      },
+    ],
+  },
+})
+```
+
+使用 `isEmpty` 过滤没有照片的产品：
+```ts
+const product = prisma.product.findMany({
+  where: {
+    photos: {
+      isEmpty: true,
+    },
+  },
+})
+```
+
+使用 `some` 来过滤一张或多张照片的 url 为“2.jpg”的产品：
+```ts
+const product = prisma.product.findFirst({
+  where: {
+    photos: {
+      some: {
+        url: '2.jpg',
+      },
+    },
+  },
+})
+```
+
+使用 `none` 来过滤没有照片的 url 为“2.jpg”的产品：
+```ts
+const product = prisma.product.findFirst({
+  where: {
+    photos: {
+      none: {
+        url: '2.jpg',
+      },
+    },
+  },
+})
+```
+
+#### 使用 `create` 和 `createMany` 创建复合类型记录​类型
+**INFO:**
+*当您使用具有唯一限制的复合类型创建记录时，请注意，MongoDB 不会在记录内强制执行唯一值。[了解更多](https://www.prisma.io/docs/orm/prisma-client/special-fields-and-types/composite-types#duplicate-values-in-unique-fields-of-composite-types)。*
+
+可以使用 `set` 操作在 `create` 或 `createMany` 方法中创建复合类型。
+例如，您可以在 `create` 中使用 `set` 在 Order 中创建 Address 复合类型：
+```ts
+const order = await prisma.order.create({
+  data: {
+    // Normal relation
+    product: { connect: { id: 'some-object-id' } },
+    color: 'Red',
+    size: 'Large',
+    // Composite type
+    shippingAddress: {
+      set: {
+        street: '1084 Candycane Lane',
+        city: 'Silverlake',
+        zip: '84323',
+      },
+    },
+  },
+})
+```
+
+您还可以使用速记符号，省略集合并仅指定要创建的字段：
+```ts
+const order = await prisma.order.create({
+  data: {
+    // Normal relation
+    product: { connect: { id: 'some-object-id' } },
+    color: 'Red',
+    size: 'Large',
+    // Composite type
+    shippingAddress: {
+      street: '1084 Candycane Lane',
+      city: 'Silverlake',
+      zip: '84323',
+    },
+  },
+})
+```
+
+对于可选类型，例如 billingAddress，您还可以将该值设置为 null：
+```ts
+const order = await prisma.order.create({
+  data: {
+    // Normal relation
+    product: { connect: { id: 'some-object-id' } },
+    color: 'Red',
+    size: 'Large',
+    // Composite type
+    shippingAddress: {
+      street: '1084 Candycane Lane',
+      city: 'Silverlake',
+      zip: '84323',
+    },
+    // Embedded optional type, set to null
+    billingAddress: {
+      set: null,
+    },
+  },
+})
+```
+
+要对产品包含多张照片列表的情况进行建模，您可以一次设置多个合成类型：
+```ts
+const product = await prisma.product.create({
+  data: {
+    name: 'Forest Runners',
+    price: 59.99,
+    colors: ['Red', 'Green'],
+    sizes: ['Small', 'Medium', 'Large'],
+    // New composite type
+    photos: {
+      set: [
+        { height: 100, width: 200, url: '1.jpg' },
+        { height: 100, width: 200, url: '2.jpg' },
+      ],
+    },
+  },
+})
+```
+
+您还可以使用速记符号，省略集合并仅指定要创建的字段：
+```ts
+const product = await prisma.product.create({
+  data: {
+    name: 'Forest Runners',
+    price: 59.99,
+    // Scalar lists that we already support
+    colors: ['Red', 'Green'],
+    sizes: ['Small', 'Medium', 'Large'],
+    // New composite type
+    photos: [
+      { height: 100, width: 200, url: '1.jpg' },
+      { height: 100, width: 200, url: '2.jpg' },
+    ],
+  },
+})
+```
+
+这些操作也在 `createMany` 方法中工作。例如，您可以创建多个产品，每个产品都包含照片列表：
+```ts
+const product = await prisma.product.createMany({
+  data: [
+    {
+      name: 'Forest Runners',
+      price: 59.99,
+      colors: ['Red', 'Green'],
+      sizes: ['Small', 'Medium', 'Large'],
+      photos: [
+        { height: 100, width: 200, url: '1.jpg' },
+        { height: 100, width: 200, url: '2.jpg' },
+      ],
+    },
+    {
+      name: 'Alpine Blazers',
+      price: 85.99,
+      colors: ['Blue', 'Red'],
+      sizes: ['Large', 'XLarge'],
+      photos: [
+        { height: 100, width: 200, url: '1.jpg' },
+        { height: 150, width: 200, url: '4.jpg' },
+        { height: 200, width: 200, url: '5.jpg' },
+      ],
+    },
+  ],
+})
+```
+
+#### 在 `update` 和 `updateMany` 中更改复合类型​
+**INFO:**
+*当您使用具有唯一限制的复合类型更新记录时，请注意，MongoDB 不会强制记录内的值唯一。[了解更多](https://www.prisma.io/docs/orm/prisma-client/special-fields-and-types/composite-types#duplicate-values-in-unique-fields-of-composite-types)。*
+可以在 `update` 或 `updateMany` 方法中设置、更新或删除复合类型。
+
+##### 更改单个复合类型​
+使用 `set``、unset` `update` 和 `upsert` 操作来更改单个复合类型：
+- 使用 `set` 设置复合类型，覆盖任何现有值
+- 使用 `unset` 取消设置复合类型。与 `set: null` 不同，`unset` 会完全删除该字段
+- 使用 `update` 更新复合类型
+- 使用 `upsert` 更新现有复合类型（如果存在），否则设置复合类型
+
+例如，使用 `update` 将所需的 ShippingAddress 更新为订单中的地址复合类型：
+```ts
+const order = await prisma.order.update({
+  where: {
+    id: 'some-object-id',
+  },
+  data: {
+    shippingAddress: {
+      // Update just the zip field
+      update: {
+        zip: '41232',
+      },
+    },
+  },
+})
+```
+
+对于可选的嵌入类型，例如 billingAddress，如果新记录不存在，请使用 `upsert` 创建新记录，如果存在则更新记录：
+```ts
+const order = await prisma.order.update({
+  where: {
+    id: 'some-object-id',
+  },
+  data: {
+    billingAddress: {
+      // Create the address if it doesn't exist,
+      // otherwise update it
+      upsert: {
+        set: {
+          street: '1084 Candycane Lane',
+          city: 'Silverlake',
+          zip: '84323',
+        },
+        update: {
+          zip: '84323',
+        },
+      },
+    },
+  },
+})
+```
+
+您还可以使用 `unset` 操作来删除可选的嵌入类型。
+以下示例使用 `unset` 从订单中删除 billingAddress：
+```ts
+const order = await prisma.order.update({
+  where: {
+    id: 'some-object-id',
+  },
+  data: {
+    billingAddress: {
+      // Unset the billing address
+      // Removes "billingAddress" field from order
+      unset: true,
+    },
+  },
+})
+```
+
+您可以使用 `updateMany` 中的过滤器来更新与复合类型匹配的所有记录。
+以下示例使用 `is` 过滤器来匹配订单列表中送货地址的街道名称：
+```ts
+const orders = await prisma.order.updateMany({
+  where: {
+    shippingAddress: {
+      is: {
+        street: '555 Candy Cane Lane',
+      },
+    },
+  },
+  data: {
+    shippingAddress: {
+      update: {
+        street: '111 Candy Cane Drive',
+      },
+    },
+  },
+})
+```
+
+
+##### 更改多种复合类型​
+使用 `set`、`push`、`updateMany` 和 `deleteMany` 操作来更改复合类型列表：
+- `set`：设置复合类型的嵌入列表，覆盖任何现有列表
+- `push`:将值推送到复合类型嵌入列表的末尾
+- `updateMany`：一次更新多个复合类型
+- `deleteMany`：一次删除多个复合类型
+
+例如，使用`push`将新照片添加到照片列表中：
+```ts
+const product = prisma.product.update({
+  where: {
+    id: '62de6d328a65d8fffdae2c18',
+  },
+  data: {
+    photos: {
+      // Push a photo to the end of the photos list
+      push: [{ height: 100, width: 200, url: '1.jpg' }],
+    },
+  },
+})
+```
+
+使用 `updateMany` 更新 url 为 1.jpg 或 2.png 的照片：
+```ts
+const product = prisma.product.update({
+  where: {
+    id: '62de6d328a65d8fffdae2c18',
+  },
+  data: {
+    photos: {
+      updateMany: {
+        where: {
+          url: '1.jpg',
+        },
+        data: {
+          url: '2.png',
+        },
+      },
+    },
+  },
+})
+```
+
+以下示例使用`deleteMany`删除所有高度为100的照片：
+```ts
+const product = prisma.product.update({
+  where: {
+    id: '62de6d328a65d8fffdae2c18',
+  },
+  data: {
+    photos: {
+      deleteMany: {
+        where: {
+          height: 100,
+        },
+      },
+    },
+  },
+})
+```
+
+#### 使用 `upsert` 更新插入复合类型​
+**INFO:**
+*当您创建或更新具有唯一限制的复合类型中的值时，请注意，MongoDB 不会在记录内强制执行唯一值。[了解更多](https://www.prisma.io/docs/orm/prisma-client/special-fields-and-types/composite-types#duplicate-values-in-unique-fields-of-composite-types)。*
+
+要创建或更新复合类型，请使用 `upsert` 方法。您可以使用与上面的`create`和`update`方法相同的复合操作。
+
+例如，使用 `upsert` 创建新产品或将照片添加到现有产品：
+```ts
+const product = await prisma.product.upsert({
+  where: {
+    name: 'Forest Runners',
+  },
+  create: {
+    name: 'Forest Runners',
+    price: 59.99,
+    colors: ['Red', 'Green'],
+    sizes: ['Small', 'Medium', 'Large'],
+    photos: [
+      { height: 100, width: 200, url: '1.jpg' },
+      { height: 100, width: 200, url: '2.jpg' },
+    ],
+  },
+  update: {
+    photos: {
+      push: { height: 300, width: 400, url: '3.jpg' },
+    },
+  },
+})
+```
+
+#### 使用 `delete` 和 `deleteMany` 删除包含复合类型的记录​
+要删除嵌入复合类型的记录，请使用 `delete` 或 `deleteMany` 方法。这也将删除嵌入的复合类型。
+例如，使用 `deleteMany` 删除所有尺寸为“Small”的产品。这也将删除所有嵌入的照片。
+```ts
+const deleteProduct = await prisma.product.deleteMany({
+  where: {
+    sizes: {
+      equals: 'Small',
+    },
+  },
+})
+```
+
+您还可以使用过滤器删除与复合类型匹配的记录。
+下面的示例使用 `some` 过滤器删除包含特定照片的产品：
+```ts
+const product = await prisma.product.deleteMany({
+  where: {
+    photos: {
+      some: {
+        url: '2.jpg',
+      },
+    },
+  },
+})
+```
+
+#### 排序复合类型​
+您可以使用 `orderBy` 操作对结果进行升序或降序排序。
+例如，以下命令查找所有订单，并按送货地址中的城市名称升序对它们进行排序：
+```ts
+const orders = await prisma.order.findMany({
+  orderBy: {
+    shippingAddress: {
+      city: 'asc',
+    },
+  },
+})
+```
+
+#### 复合类型的唯一字段中的重复值​
+对具有唯一约束的复合类型的记录执行以下任何操作时请务必小心。在这种情况下，MongoDB 不会强制记录内的值唯一。
+- 当您创建记录时
+- 当您向记录添加数据时
+- 当您更新记录中的数据时
+
+如果您的架构具有带有 `@@unique` 约束的复合类型，MongoDB 会阻止您在包含此复合类型的两个或多个记录中存储相同的约束值值。但是，MongoDB 并不阻止您在单个记录中存储同一字段值的多个副本。
+请注意，您可以[使用 Prisma ORM 关系来解决此问题](https://www.prisma.io/docs/orm/prisma-client/special-fields-and-types/composite-types#use-prisma-orm-relations-to-enforce-unique-values-in-a-record)。
+
+例如，在以下架构中，MailBox 有一个复合类型，即地址，它对电子邮件字段有 `@@unique` 约束。
+```ts
+type Address {
+  email String
+}
+
+model MailBox {
+  name      String
+  addresses Address[]
+
+  @@unique([addresses.email])
+}
+```
+
+以下代码创建一条记录，其中地址中有两个相同的值。在这种情况下，MongoDB 不会抛出错误，并且它将 alice@prisma.io 存储在地址中两次。
+```ts
+await prisma.MailBox.createMany({
+  data: [
+    {
+      name: 'Alice',
+      addresses: {
+        set: [
+          {
+            address: 'alice@prisma.io', // Not unique
+          },
+          {
+            address: 'alice@prisma.io', // Not unique
+          },
+        ],
+      },
+    },
+  ],
+})
+```
+**注意：**
+*如果您尝试在两个单独的记录中存储相同的值，MongoDB 会抛出错误。在上面的示例中，如果您尝试存储用户 Alice 和用户 Bob 的电子邮件地址 alice@prisma.io，MongoDB 不会存储数据并引发错误。*
+
+##### 使用 Prisma ORM 关系在记录中强制执行唯一值​
+在上面的示例中，MongoDB 没有对嵌套地址名称强制执行唯一约束。但是，您可以对数据进行不同的建模，以在记录中强制使用唯一值。为此，请使用 Prisma ORM 关系将复合类型转换为集合。设置与该集合的关系，并对您想要唯一的字段施加唯一约束。
+在以下示例中，MongoDB 在记录中强制执行唯一值。邮箱和地址模型之间存在关系。此外，Address 模型中的名称字段具有唯一约束。
+```prisma
+model Address {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  name      String
+  mailbox   Mailbox? @relation(fields: [mailboxId], references: [id])
+  mailboxId String?  @db.ObjectId
+
+  @@unique([name])
+}
+
+model Mailbox {
+  id        String    @id @default(auto()) @map("_id") @db.ObjectId
+  name      String
+  addresses Address[] @relation
+}
+```
+
+```ts
+await prisma.MailBox.create({
+  data: {
+    name: 'Alice',
+    addresses: {
+      create: [
+        { name: 'alice@prisma.io' }, // Not unique
+        { name: 'alice@prisma.io' }, // Not unique
+      ],
+    },
+  },
+}
+```
+如果运行上面的代码，MongoDB 会强制执行唯一约束。它不允许您的应用程序添加两个名为 alice@prisma.io 的地址。
+
+#### Null and undefined
+**WARNING:**
+*在 Prisma ORM 5.20.0 之前，未定义被视为特殊值，不会包含在生成的查询中。此行为可能会导致意外结果和数据丢失。如果您使用的是旧版本的 Prisma ORM，我们强烈建议更新到 5.20.0 或更高版本，以利用新的 strictUndefinedChecks 功能。*
+
+##### 严格的未定义检查（预览功能）​
+要启用此功能，请将以下内容添加到您的 Prisma 架构中：
+```prisma
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["strictUndefinedChecks"]
+}
+```
+
+##### 使用严格的未定义检查​
+当此功能启用时：
+1. 在查询中显式将字段设置为`undefined`将导致运行时错误。
+2. 要跳过查询中的字段，请使用新的 `Prisma.skip` 符号而不是`undefined`
+```ts
+// This will throw an error
+prisma.user.create({
+  data: {
+    name: 'Alice',
+    email: undefined // Error: Cannot explicitly use undefined here
+  }
+})
+
+// Use `Prisma.skip` (a symbol provided by Prisma) to omit a field
+prisma.user.create({
+  data: {
+    name: 'Alice',
+    email: Prisma.skip // This field will be omitted from the query
+  }
+})
+```
+
+此更改有助于防止意外删除或更新，例如：
+```ts
+// Before: This would delete all users
+prisma.user.deleteMany({
+  where: {
+    id: undefined
+  }
+})
+
+// After: This will throw an error
+Invalid \`prisma.user.deleteMany()\` invocation in
+/client/tests/functional/strictUndefinedChecks/test.ts:0:0
+  XX })
+  XX 
+  XX test('throws on undefined input field', async () => {
+→ XX   const result = prisma.user.deleteMany({
+         where: {
+           id: undefined
+               ~~~~~~~~~
+         }
+       })
+Invalid value for argument \`where\`: explicitly \`undefined\` values are not allowed."
+```
+
+##### 迁移现有代码
+```ts
+// Before
+let optionalEmail: string | undefined
+
+prisma.user.create({
+  data: {
+    name: 'Alice',
+    email: optionalEmail
+  }
+})
+
+// After
+prisma.user.create({
+  data: {
+    name: 'Alice',
+    email: optionalEmail ?? Prisma.skip
+  }
+})
+```
+这一新行为旨在成为 Prisma ORM 6 中的默认行为。
+
+
+##### 迁移现有代码
+除了 `strictUndefinedChecks` 之外，我们还建议启用 TypeScript 编译器选项 `exactOptionalPropertyTypes`。此选项强制可选属性必须完全匹配，这可以帮助捕获代码中未定义值的潜在问题。虽然 `strictUndefineChecks` 会因无效的未定义使用而引发运行时错误，但 `exactOptionalPropertyTypes` 将在构建过程中捕获这些问题。
+在 [TypeScript 文档中了解有关 excactOptionalPropertyTypes 的更多信息](https://www.typescriptlang.org/tsconfig/#exactOptionalPropertyTypes)。
+
+##### 遗留行为​
+Prisma 客户端区分 `null` 和 `undefined`：
+- `null` 是一个值
+- `undefined`意味着什么也不做
+
+**INFO:**
+在具有 GraphQL 上下文的 Prisma ORM 中考虑这一点尤其重要，其中 `null` 和 `undefined` 是可以互换的。
+
 
 ## extensions
 
