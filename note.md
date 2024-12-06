@@ -8686,10 +8686,12 @@ await prisma.user.create({
 - 所有扩展客户端和标准客户端共享相同的连接池。
 
 **NOTE:**
-*扩展的作者可以修改此行为，因为他们能够将任意代码作为扩展的一部分运行。例如，扩展实际上可能会创建一个全新的 PrismaClient 实例（包括其自己的查询引擎和连接池）。请务必检查您正在使用的扩展的文档，以了解它可能实现的任何特定行为。*
+_扩展的作者可以修改此行为，因为他们能够将任意代码作为扩展的一部分运行。例如，扩展实际上可能会创建一个全新的 PrismaClient 实例（包括其自己的查询引擎和连接池）。请务必检查您正在使用的扩展的文档，以了解它可能实现的任何特定行为。_
 
-#### 扩展客户的示例用例​ ​
+#### 扩展客户的示例用例 ​ ​
+
 由于扩展客户端在隔离实例中运行，因此它们是执行以下操作的好方法，例如：
+
 - 实现行级安全性 (RLS)，其中每个 HTTP 请求都有自己的客户端，并具有自己的 RLS 扩展，并使用会话数据进行自定义。这可以使每个用户完全独立，每个用户都在单独的客户端中。
 - 为 User 模型添加 `user.current()` 方法以获取当前登录的用户。
 - 如果设置了调试 cookie，则为请求启用更详细的日志记录。
@@ -8697,8 +8699,11 @@ await prisma.user.create({
 - 从模型中删除 `delete` 方法，除非应用程序调用管理端点并且用户具有必要的权限。
 
 ### 向 Prisma 客户端添加扩展 ​
+
 您可以使用两种主要方式创建扩展：
-- 使用客户端级别的 `$extends` 方法 
+
+- 使用客户端级别的 `$extends` 方法
+
 ```ts
 const prisma = new PrismaClient().$extends({
   name: 'signUp', // Optional: name appears in error logs
@@ -8709,6 +8714,7 @@ const prisma = new PrismaClient().$extends({
 ```
 
 - 使用 `Prisma.defineExtension` 方法定义扩展并将其分配给变量，然后将扩展传递给客户端级 `$extends` 方法
+
 ```ts
 import { Prisma } from '@prisma/client'
 
@@ -8725,10 +8731,12 @@ const prisma = new PrismaClient().$extends(myExtension)
 ```
 
 **TIP:**
-*当您想要将扩展分成项目内的多个文件或目录时，此模式非常有用。*
+_当您想要将扩展分成项目内的多个文件或目录时，此模式非常有用。_
 
 ### 为错误日志命名扩展名 ​
+
 您可以命名您的扩展以帮助在错误日志中识别它们。为此，请使用可选字段名称。例如：
+
 ```ts
 const prisma = new PrismaClient().$extends({
   name: `signUp`,  // (Optional) Extension name
@@ -8739,62 +8747,74 @@ const prisma = new PrismaClient().$extends({
 ```
 
 ### 多种扩展 ​
+
 您可以通过以下两种方式之一将扩展与扩展客户端关联：
+
 - 您可以将其与扩展客户端单独关联，
 - 您可以将扩展与其他扩展结合起来，并将所有这些扩展与扩展客户端相关联。这些组合扩展的功能适用于同一扩展客户端。**注意：组合扩展可能会发生冲突。**
 
-#### [将多个扩展应用到扩展客户端​](https://www.prisma.io/docs/orm/prisma-client/client-extensions#apply-multiple-extensions-to-an-extended-client) ​
+#### [将多个扩展应用到扩展客户端 ​](https://www.prisma.io/docs/orm/prisma-client/client-extensions#apply-multiple-extensions-to-an-extended-client) ​
 
-#### 组合扩展中的冲突​ ​
+#### 组合扩展中的冲突 ​ ​
+
 当您将两个或多个扩展组合成一个扩展客户端时，您声明的最后一个扩展在任何冲突中优先。在上面选项 1 的示例中，假设在扩展 A 中定义了一个名为 myExtensionMethod() 的方法，在扩展 B 中定义了一个名为 myExtensionMethod() 的方法。当您调用 prismaAB.myExtensionMethod() 时，Prisma 客户端将使用在 extensionB 中定义的 myExtensionMethod()。
 
 ### 扩展客户端的类型 ​
+
 您可以使用 `typeof` 实用程序推断扩展 Prisma Client 实例的类型，如下所示：
+
 ```ts
 const extendedPrismaClient = new PrismaClient().$extends({
   /** extension */
-})
+});
 
-type ExtendedPrismaClient = typeof extendedPrismaClient
+type ExtendedPrismaClient = typeof extendedPrismaClient;
 ```
 
 如果您将 Prisma Client 作为单例使用，则可以使用 `typeof` 和 `ReturnType`实用程序获取扩展 Prisma Client 实例的类型，如下所示：
+
 ```ts
 function getExtendedClient() {
   return new PrismaClient().$extends({
     /* extension */
-  })
+  });
 }
 
-type ExtendedPrismaClient = ReturnType<typeof getExtendedClient>
+type ExtendedPrismaClient = ReturnType<typeof getExtendedClient>;
 ```
 
 ### 局限性 ​
+
 #### 与扩展客户一起使用 `$on` 和 `$use​`
+
 `$on` 和 `$use` 在扩展客户端中不可用。如果您想继续在扩展客户端中使用这些客户端级方法，则需要在扩展客户端之前将它们连接起来。
+
 ```ts
-const prisma = new PrismaClient()
+const prisma = new PrismaClient();
 
 prisma.$use(async (params, next) => {
-  console.log('This is middleware!')
-  return next(params)
-})
+  console.log("This is middleware!");
+  return next(params);
+});
 
 const xPrisma = prisma.$extends({
-  name: 'myExtension',
+  name: "myExtension",
   model: {
     user: {
       async signUp(email: string) {
-        await prisma.user.create({ data: { email } })
+        await prisma.user.create({ data: { email } });
       },
     },
   },
-})
+});
 ```
+
 要了解更多信息，请参阅有关 [$on](https://www.prisma.io/docs/orm/reference/prisma-client-reference#on) 和 [$use](https://www.prisma.io/docs/orm/reference/prisma-client-reference#use) 的文档
 
-#### 在扩展客户端中使用客户端级方法​
+#### 在扩展客户端中使用客户端级方法 ​
+
 客户端级方法不一定存在于扩展客户端上。对于这些客户端，您需要在使用之前首先检查是否存在。
+
 ```ts
 const xPrisma = new PrismaClient().$extends(...);
 
@@ -8803,30 +8823,1012 @@ if (xPrisma.$connect) {
 }
 ```
 
-#### 与嵌套操作一起使用​
+#### 与嵌套操作一起使用 ​
+
 查询扩展类型不支持嵌套读写操作。
 
 ### `model`：将自定义方法添加到模型中
 
+您可以使用 `model` [Prisma 客户端扩展](https://www.prisma.io/docs/orm/prisma-client/client-extensions)组件类型将自定义方法添加到模型中。
+模型组件的可能用途包括：
+
+- 新操作将与现有 Prisma 客户端操作一起运行，例如 `findMany`
+- 封装业务逻辑
+- 重复操作
+- 特定于模型的实用程序
+
+#### 添加自定义方法 ​
+
+使用 `$extends` [客户端级方法](https://www.prisma.io/docs/orm/reference/prisma-client-reference#client-methods)创建扩展客户端。扩展客户端是标准 Prisma 客户端的一种变体，由一个或多个扩展封装。使用`model`扩展组件向架构中的模型添加方法。
+
+##### 向特定模型添加自定义方法 ​
+
+要扩展架构中的特定模型，请使用以下结构。此示例向用户模型添加一个方法。
+
+```ts
+const prisma = new PrismaClient().$extends({
+  name?: '<name>',  // (optional) names the extension for error logs
+  model?: {
+    user: { ... }   // in this case, we extend the `user` model
+  },
+});
+```
+
+###### 示例 ​
+
+以下示例将一个名为 signUp 的方法添加到用户模型中。此方法使用指定的电子邮件地址创建一个新用户：
+
+```ts
+const prisma = new PrismaClient().$extends({
+  model: {
+    user: {
+      async signUp(email: string) {
+        await prisma.user.create({ data: { email } });
+      },
+    },
+  },
+});
+```
+
+您可以在应用程序中调用 signUp，如下所示：
+
+```ts
+const user = await prisma.user.signUp("john@prisma.io");
+```
+
+##### 向架构中的所有模型添加自定义方法 ​
+
+要扩展架构中的所有模型，请使用以下结构：
+
+```ts
+const prisma = new PrismaClient().$extends({
+  name?: '<name>', // `name` is an optional field that you can use to name the extension for error logs
+  model?: {
+    $allModels: { ... }
+  },
+})
+```
+
+###### 示例 ​
+
+下面的示例向所有模型添加一个 exists 方法。
+
+```ts
+const prisma = new PrismaClient().$extends({
+  model: {
+    $allModels: {
+      async exists<T>(
+        this: T,
+        where: Prisma.Args<T, "findFirst">["where"]
+      ): Promise<boolean> {
+        // Get the current model at runtime
+        const context = Prisma.getExtensionContext(this);
+
+        const result = await (context as any).findFirst({ where });
+        return result !== null;
+      },
+    },
+  },
+});
+```
+
+您可以按如下方式在应用程序中调用存在：
+
+```ts
+// `exists` method available on all models
+await prisma.user.exists({ name: "Alice" });
+await prisma.post.exists({
+  OR: [{ title: { contains: "Prisma" } }, { content: { contains: "Prisma" } }],
+});
+```
+
+#### 从另一个自定义方法调用自定义方法 ​
+
+如果两个方法是在同一模型上声明的，则可以从另一个自定义方法调用这两个方法。
+例如，您可以从用户模型上的另一个自定义方法调用用户模型上的自定义方法。这两个方法是在同一扩展中还是在不同扩展中声明并不重要。
+
+为此，请使用 `Prisma.getExtensionContext(this).methodName`。请注意，您不能使用 `prisma.user.methodName`。这是因为 prisma 尚未扩展，因此不包含新方法。
+
+```ts
+const prisma = new PrismaClient().$extends({
+  model: {
+    user: {
+      firstMethod() {
+        ...
+      },
+      secondMethod() {
+          Prisma.getExtensionContext(this).firstMethod()
+      }
+    }
+  }
+})
+```
+
+#### 在运行时获取当前模型名称 ​
+
+您可以在运行时使用 `Prisma.getExtensionContext(this).$name` 获取当前模型的名称。您可以使用它将模型名称写入日志、将名称发送到另一个服务或根据模型对代码进行分支。
+
+```ts
+// `context` refers to the current model
+const context = Prisma.getExtensionContext(this);
+
+// `context.name` returns the name of the current model
+console.log(context.name);
+
+// Usage
+await(context as any).findFirst({ args });
+```
+
+有关在运行时检索当前模型名称的具体示例，[请参阅向架构中的所有模型添加自定义方法](https://www.prisma.io/docs/orm/prisma-client/client-extensions/model#example-1)。
+
+#### 高级类型安全：用于定义通用扩展的类型实用程序 ​
+
+您可以使用类型实用程序提高共享扩展中模型组件的[类型安全性](https://www.prisma.io/docs/orm/prisma-client/client-extensions/type-utilities)。
 
 ### `client`：向 Prisma 客户端添加方法
 
+您可以使用客户端 [Prisma 客户端扩展组件](https://www.prisma.io/docs/orm/prisma-client/client-extensions)将顶级方法添加到 Prisma 客户端。
+
+#### 扩展 Prisma 客户端 ​
+
+使用 `$extends` [客户端级方法](https://www.prisma.io/docs/orm/reference/prisma-client-reference#client-methods)创建扩展客户端。扩展客户端是标准 Prisma 客户端的一种变体，由一个或多个扩展封装。使用客户端扩展组件将顶级方法添加到 Prisma 客户端。
+要将顶级方法添加到 Prisma Client，请使用以下结构：
+
+```ts
+const prisma = new PrismaClient().$extends({
+  client?: { ... }
+})
+```
+
+##### 示例
+
+以下示例使用客户端组件向 Prisma 客户端添加两个方法：
+
+- `$log`输出一条消息。
+- `$totalQueries`返回当前客户端实例执行的查询数。它使用指标功能来收集此信息。
+  **INFO:**
+  _要在项目中使用指标，您必须在 schema.prisma 文件的`generator`中启用`metrics`功能标志。[了解更多。](https://www.prisma.io/docs/orm/prisma-client/observability-and-logging/metrics#2-enable-the-feature-flag-in-the-prisma-schema-file)_
+
+```ts
+const prisma = new PrismaClient().$extends({
+  client: {
+    $log: (s: string) => console.log(s),
+    async $totalQueries() {
+      const index_prisma_client_queries_total = 0;
+      // Prisma.getExtensionContext(this) in the following block
+      // returns the current client instance
+      const metricsCounters = await (
+        await Prisma.getExtensionContext(this).$metrics.json()
+      ).counters;
+
+      return metricsCounters[index_prisma_client_queries_total].value;
+    },
+  },
+});
+
+async function main() {
+  prisma.$log("Hello world");
+  const totalQueries = await prisma.$totalQueries();
+  console.log(totalQueries);
+}
+```
 
 ### `query`：创建自定义 Prisma 客户端查询
 
+您可以使用 `query` [Prisma 客户端扩展](https://www.prisma.io/docs/orm/prisma-client/client-extensions)组件类型来挂钩查询生命周期并修改传入查询或其结果。
+
+您可以使用 Prisma 客户端扩展查询组件来创建独立的客户端。这提供了[中间件](https://www.prisma.io/docs/orm/prisma-client/client-extensions/middleware)的替代方案。您可以将一个客户端绑定到特定过滤器或用户，并将另一个客户端绑定到另一个过滤器或用户。
+例如，您可以执行此操作以在行级安全性 (RLS) 扩展中实现[用户隔离](https://www.prisma.io/docs/orm/prisma-client/client-extensions#extended-clients)。此外，与中间件不同，查询扩展组件为您提供端到端类型安全性。[详细了解查询扩展与中间件。](https://www.prisma.io/docs/orm/prisma-client/client-extensions/query#query-extensions-versus-middlewares)
+
+#### 扩展 Prisma 客户端查询操作 ​
+
+使用 `$extends` [客户端级方法](https://www.prisma.io/docs/orm/reference/prisma-client-reference#client-methods)创建[扩展客户端](https://www.prisma.io/docs/orm/prisma-client/client-extensions#about-prisma-client-extensions)。扩展客户端是标准 Prisma 客户端的一种变体，由一个或多个扩展封装。
+使用查询扩展组件来修改查询。您可以通过以下方式修改自定义查询：
+
+- [特定模型中的特定操作](https://www.prisma.io/docs/orm/prisma-client/client-extensions/query#modify-a-specific-operation-in-a-specific-model)
+- [模式的所有模型中的特定操作](https://www.prisma.io/docs/orm/prisma-client/client-extensions/query#modify-a-specific-operation-in-all-models-of-your-schema)
+- [所有 Prisma 客户端操作](https://www.prisma.io/docs/orm/prisma-client/client-extensions/query#modify-all-prisma-client-operations)
+- [特定模型中的所有操作](https://www.prisma.io/docs/orm/prisma-client/client-extensions/query#modify-all-operations-in-a-specific-model)
+- [架构的所有模型中的所有操作](https://www.prisma.io/docs/orm/prisma-client/client-extensions/query#modify-all-operations-in-all-models-of-your-schema)
+- [特定的顶级原始查询操作](https://www.prisma.io/docs/orm/prisma-client/client-extensions/query#modify-a-top-level-raw-query-operation)
+
+要创建自定义查询，请使用以下结构：
+
+```ts
+const prisma = new PrismaClient().$extends({
+  name?: 'name',
+  query?: {
+    user: { ... } // in this case, we add a query to the `user` model
+  },
+});
+```
+
+属性如下：
+
+- `name`：（可选）指定错误日志中显示的扩展名。
+- `query`：定义自定义查询。
+
+##### 修改特定模型中的特定操作 ​
+
+`query`对象可以包含映射到 Prisma [客户端操作](https://www.prisma.io/docs/orm/reference/prisma-client-reference#model-queries)名称的函数，例如 `findUnique()`、`findFirst`、`findMany`、`count` 和 `create`。
+以下示例将 user.findMany 修改为使用自定义查询，仅查找 18 岁以上的用户：
+
+```ts
+const prisma = new PrismaClient().$extends({
+  query: {
+    user: {
+      async findMany({ model, operation, args, query }) {
+        // take incoming `where` and set `age`
+        args.where = { ...args.where, age: { gt: 18 } };
+
+        return query(args);
+      },
+    },
+  },
+});
+
+await prisma.user.findMany(); // returns users whose age is greater than 18
+```
+
+在上面的示例中，对 `prisma.user.findMany` 的调用会触发 `query.user.findMany`。每个回调都会接收一个描述查询的类型安全的 `{ model, operation, args, query }` 对象。该对象具有以下属性：
+
+- `model`：我们要扩展的查询的包含模型的名称。
+  在上面的示例中，模型是“User”类型的字符串。
+- `operation`：正在扩展和执行的操作的名称。
+  在上面的示例中，操作是“findMany”类型的字符串。
+- `args`：要扩展的具体查询输入信息。
+  这是一个类型安全的对象，您可以在查询发生之前对其进行更改。您可以改变 `args` 中的任何属性。例外：您不能改变 `include` 或 `select`，因为这会改变预期的输出类型和中断类型安全性。
+- `query`：对查询结果的承诺。
+  - 您可以使用`await`，然后改变这个 promise 的结果，因为它的值是类型安全的。 TypeScript 捕获对象上的任何不安全突变。
+
+##### 修改架构的所有模型中的特定操作 ​
+
+要扩展架构的所有模型中的查询，请使用 `$allModels` 而不是特定的模型名称。例如：
+
+```ts
+const prisma = new PrismaClient().$extends({
+  query: {
+    $allModels: {
+      async findMany({ model, operation, args, query }) {
+        // set `take` and fill with the rest of `args`
+        args = { ...args, take: 100 };
+
+        return query(args);
+      },
+    },
+  },
+});
+```
+
+##### 修改特定模型中的所有操作 ​
+
+使用 `$allOperations` 扩展特定模型中的所有操作。
+例如，以下代码将自定义查询应用于用户模型上的所有操作：
+
+```ts
+const prisma = new PrismaClient().$extends({
+  query: {
+    user: {
+      $allOperations({ model, operation, args, query }) {
+        /* your custom logic here */
+        return query(args);
+      },
+    },
+  },
+});
+```
+
+##### 修改所有 Prisma 客户端操作 ​
+
+使用 `$allOperations` 方法修改 Prisma 客户端中存在的所有查询方法。 `$allOperations` 可用于模型操作和原始查询。
+您可以按如下方式修改所有方法：
+
+```ts
+const prisma = new PrismaClient().$extends({
+  query: {
+    $allOperations({ model, operation, args, query }) {
+      /* your custom logic for modifying all Prisma Client operations here */
+      return query(args);
+    },
+  },
+});
+```
+
+如果调用[原始查询](https://www.prisma.io/docs/orm/prisma-client/using-raw-sql/raw-queries)，则传递给回调的`model`参数将是`undefined`的。
+例如，您可以使用 `$allOperations` 方法来记录查询，如下所示：
+
+```ts
+const prisma = new PrismaClient().$extends({
+  query: {
+    async $allOperations({ operation, model, args, query }) {
+      const start = performance.now();
+      const result = await query(args);
+      const end = performance.now();
+      const time = end - start;
+      console.log(
+        util.inspect(
+          { model, operation, args, time },
+          { showHidden: false, depth: null, colors: true }
+        )
+      );
+      return result;
+    },
+  },
+});
+```
+
+##### 修改架构的所有模型中的所有操作 ​
+
+使用 `$allModels` 和 `$allOperations` 扩展架构的所有模型中的所有操作。
+要将自定义查询应用于架构的所有模型上的所有操作：
+
+```ts
+const prisma = new PrismaClient().$extends({
+  query: {
+    $allModels: {
+      $allOperations({ model, operation, args, query }) {
+        /* your custom logic for modifying all operations on all models here */
+        return query(args);
+      },
+    },
+  },
+});
+```
+
+##### 修改顶级原始查询操作 ​
+
+要将自定义行为应用于特定的顶级原始查询操作，请使用顶级原始查询函数的名称而不是模型名称：
+Ralational databases
+
+```ts
+const prisma = new PrismaClient().$extends({
+  query: {
+    $queryRaw({ args, query, operation }) {
+      // handle $queryRaw operation
+      return query(args);
+    },
+    $executeRaw({ args, query, operation }) {
+      // handle $executeRaw operation
+      return query(args);
+    },
+    $queryRawUnsafe({ args, query, operation }) {
+      // handle $queryRawUnsafe operation
+      return query(args);
+    },
+    $executeRawUnsafe({ args, query, operation }) {
+      // handle $executeRawUnsafe operation
+      return query(args);
+    },
+  },
+});
+```
+
+MongoDB
+
+```ts
+const prisma = new PrismaClient().$extends({
+  query: {
+    $runCommandRaw({ args, query, operation }) {
+      // handle $runCommandRaw operation
+      return query(args);
+    },
+  },
+});
+```
+
+##### 改变查询结果 ​
+
+您可以使用`await`，然后改变查询 promise 的结果。
+
+```ts
+const prisma = new PrismaClient().$extends({
+  query: {
+    user: {
+      async findFirst({ model, operation, args, query }) {
+        const user = await query(args);
+
+        if (user.password !== undefined) {
+          user.password = "******";
+        }
+
+        return user;
+      },
+    },
+  },
+});
+```
+
+**INFO:**
+_我们包含上面的例子来表明这是可能的。但是，出于性能原因，我们建议您使用结果组件类型来覆盖现有字段。在这种情况下，结果组件类型通常会提供更好的性能，因为它仅在访问时进行计算。查询组件类型在查询执行后计算。_
+
+#### 将查询包装到批量事务中 ​
+
+您可以将扩展查询包装到[批处理事务](https://www.prisma.io/docs/orm/prisma-client/queries/transactions)中。例如，您可以使用它来制定行级安全性 (RLS)。
+​ 以下示例扩展了 findFirst ，以便它在批处理事务中运行。
+
+```ts
+const prisma = new PrismaClient().$extends({
+  query: {
+    user: {
+      // Get the input `args` and a callback to `query`
+      async findFirst({ args, query, operation }) {
+        const [result] = await prisma.$transaction([query(args)]); // wrap the query in a batch transaction, and destructure the result to return an array
+        return result; // return the first result found in the array
+      },
+    },
+  },
+});
+```
+
+#### 查询扩展与中间件 ​
+
+您可以使用查询扩展或中间件来挂钩查询生命周期并修改传入查询或其结果。客户端扩展和中间件在以下方面有所不同：
+
+- 中间件总是在全局范围内应用于同一个客户端。客户端扩展是隔离的，除非您有意将它们组合在一起。[了解有关客户端扩展的更多信息。](https://www.prisma.io/docs/orm/prisma-client/client-extensions#about-prisma-client-extensions)
+  - 例如，在行级安全性 (RLS) 场景中，您可以将每个用户保留在完全独立的客户端中。使用中间件，所有用户都在同一个客户端中活动。
+- 在应用程序执行期间，通过扩展，您可以从一个或多个扩展客户端或标准 Prisma 客户端中进行选择。使用中间件，您无法选择使用哪个客户端，因为只有一个全局客户端。
+- 扩展受益于端到端类型安全和推理，但中间件则不然。
+  您可以在所有可以使用中间件的场景中使用 Prisma 客户端扩展。
+
+##### 如果使用查询扩展组件和中间件 ​
+
+- 在您的应用程序代码中，您必须在主 Prisma 客户端实例上声明所有中间件。您不能在扩展客户端上声明它们。
+- 在执行具有查询组件的中间件和扩展的情况下，Prisma Client 在执行具有查询组件的扩展之前执行中间件。 Prisma 客户端按照您使用 `$use` 或 `$extends` 实例化各个中间件和扩展的顺序执行它们。
 
 ### `result`：添加自定义字段和方法来查询结果
 
+您可以使用结果 [Prisma 客户端扩展](https://www.prisma.io/docs/orm/prisma-client/client-extensions)组件类型添加自定义字段和方法来查询结果。
+使用 `$extends` [客户端级方法](https://www.prisma.io/docs/orm/reference/prisma-client-reference#client-methods)创建扩展客户端。扩展客户端是标准 Prisma 客户端的一种变体，由一个或多个扩展封装。
+要添加自定义字段或方法来查询结果，请使用以下结构。在此示例中，我们将自定义字段 myCompulatedField 添加到用户模型查询的结果中。
+
+```ts
+const prisma = new PrismaClient().$extends({
+  name?: 'name',
+  result?: {
+    user: {                   // in this case, we extend the `user` model
+      myComputedField: {      // the name of the new computed field
+        needs: { ... },
+        compute() { ... }
+      },
+    },
+  },
+});
+```
+
+参数如下：
+
+- `name`：（可选）指定错误日志中显示的扩展名。
+- `result`：为查询结果定义新的字段和方法。
+- `needs`：描述结果字段依赖关系的对象。
+- `compute`：定义访问虚拟字段时如何计算虚拟字段的方法。
+
+您可以使用结果扩展组件向查询结果添加字段。这些字段在运行时计算并且是类型安全的。
+在以下示例中，我们向用户模型添加一个名为 fullName 的新虚拟字段。
+
+```ts
+const prisma = new PrismaClient().$extends({
+  result: {
+    user: {
+      fullName: {
+        // the dependencies
+        needs: { firstName: true, lastName: true },
+        compute(user) {
+          // the computation logic
+          return `${user.firstName} ${user.lastName}`;
+        },
+      },
+    },
+  },
+});
+
+const user = await prisma.user.findFirst();
+
+// return the user's full name, such as "John Doe"
+console.log(user.fullName);
+```
+
+在上面的例子中，计算的输入用户是根据需求中定义的对象自动键入的。 firstName 和 lastName 是字符串类型，因为它们是在 needs 中指定的。如果未在需求中指定，则无法访问它们。
+
+#### 在另一个计算字段中重复使用一个计算字段 ​
+
+以下示例以类型安全的方式计算用户的头衔和全名。 titleFullName 是一个重用 fullName 计算字段的计算字段。
+
+```ts
+const prisma = new PrismaClient()
+  .$extends({
+    result: {
+      user: {
+        fullName: {
+          needs: { firstName: true, lastName: true },
+          compute(user) {
+            return `${user.firstName} ${user.lastName}`;
+          },
+        },
+      },
+    },
+  })
+  .$extends({
+    result: {
+      user: {
+        titleFullName: {
+          needs: { title: true, fullName: true },
+          compute(user) {
+            return `${user.title} (${user.fullName})`;
+          },
+        },
+      },
+    },
+  });
+```
+
+##### 字段注意事项 ​
+
+- 出于性能原因，Prisma 客户端在访问时计算结果，而不是在检索时计算结果。
+- 您只能创建基于标量字段的计算字段。
+- 您只能将计算字段与 select 一起使用，并且不能聚合它们。
+  例如：
+
+```ts
+const user = await prisma.user.findFirst({
+  select: { email: true },
+});
+console.log(user.fullName); // undefined
+```
+
+#### 向结果对象添加自定义方法 ​
+
+您可以使用结果组件添加查询结果的方法。下面的示例添加了一个新方法，保存到结果对象。
+
+```ts
+const prisma = new PrismaClient().$extends({
+  result: {
+    user: {
+      save: {
+        needs: { id: true },
+        compute(user) {
+          return () =>
+            prisma.user.update({ where: { id: user.id }, data: user });
+        },
+      },
+    },
+  },
+});
+
+const user = await prisma.user.findUniqueOrThrow({ where: { id: someId } });
+user.email = "mynewmail@mailservice.com";
+await user.save();
+```
+
+#### 使用带有结果扩展组件的`omit`查询选项 ​
+
+您可以将[`omit（预览）`选项](https://www.prisma.io/docs/orm/reference/prisma-client-reference#omit-preview)与[自定义字段](https://www.prisma.io/docs/orm/prisma-client/client-extensions/result#add-a-custom-field-to-query-results)和自定义字段所需的字段一起使用。
+
+##### 从查询结果中省略自定义字段所需的字段 ​
+
+如果省略作为自定义字段的依赖项的字段，则仍会从数据库中读取该字段，即使它不会包含在查询结果中。
+以下示例省略了密码字段，该字段是自定义字段 sanitizedPassword 的依赖项：
+
+```ts
+const xprisma = prisma.$extends({
+  result: {
+    user: {
+      sanitizedPassword: {
+        needs: { password: true },
+        compute(user) {
+          return sanitize(user.password);
+        },
+      },
+    },
+  },
+});
+
+const user = await xprisma.user.findFirstOrThrow({
+  omit: {
+    password: true,
+  },
+});
+```
+
+在这种情况下，尽管结果中省略了密码，但仍会从数据库中查询它，因为它是 sanitizedPassword 自定义字段的依赖项。
+
+##### 从查询结果中省略自定义字段和依赖项 ​
+
+为了确保根本不会从数据库中查询省略的字段，您必须省略自定义字段及其依赖项。
+以下示例省略了自定义字段 sanitizedPassword 和相关密码字段：
+
+```ts
+const xprisma = prisma.$extends({
+  result: {
+    user: {
+      sanitizedPassword: {
+        needs: { password: true },
+        compute(user) {
+          return sanitize(user.password);
+        },
+      },
+    },
+  },
+});
+
+const user = await xprisma.user.findFirstOrThrow({
+  omit: {
+    sanitizedPassword: true,
+    password: true,
+  },
+});
+```
+
+在这种情况下，省略密码和 sanitizedPassword 将从结果中排除两者，并防止从数据库读取密码字段。
 
 ### 共享 Prisma 客户端扩展
 
+您可以与其他用户共享 [Prisma 客户端扩展](https://www.prisma.io/docs/orm/prisma-client/client-extensions)（作为包或模块），并将其他用户创建的扩展导入到您的项目中。
+
+如果您想构建可共享的扩展，我们还建议使用 [prisma-client-extension-starter](https://github.com/prisma/prisma-client-extension-starter) 模板。
+
+#### 安装共享的打包扩展 ​
+
+在您的项目中，您可以安装其他用户已发布到 npm 的任何 Prisma 客户端扩展。为此，请运行以下命令：
+`npm install prisma-extension-<package-name>`
+
+例如，如果可用扩展的包名称是 prisma-extension-find-or-create，您可以按如下方式安装它：
+`npm install prisma-extension-find-or-create`
+
+要从上面的示例导入查找或创建扩展，并用它包装您的客户端实例，您可以使用以下代码。此示例假设扩展名是 findOrCreate。
+
+```ts
+import findOrCreate from "prisma-extension-find-or-create";
+
+const prisma = new PrismaClient().$extends(findOrCreate);
+const user = await prisma.user.findOrCreate();
+```
+
+当您调用扩展中的方法时，请使用 `$extends` 语句中的常量名称，而不是 prisma。在上面的示例中，xprisma.user.findOrCreate 有效，但 prisma.user.findOrCreate 无效，因为原始 prisma 没有修改。
+
+##### 创建可共享的扩展 ​
+
+当您想要创建其他用户可以使用的扩展，并且不仅仅针对您的架构定制的扩展时，Prisma ORM 提供了实用程序来允许您创建可共享的扩展。
+要创建可共享的扩展： 1.使用 `Prisma.defineExtension` 将扩展定义为模块 2.使用以 `$all` 前缀开头的方法之一，例如 `$allModels` 或 `$allOperations`
+
+###### 定义扩展 ​
+
+使用 `Prisma.defineExtension` 方法使您的扩展可共享。您可以使用它来打包扩展，以便将扩展分离到单独的文件中，或者作为 npm 包与其他用户共享。
+`Prisma.defineExtension` 的好处是它为开发中的扩展作者和共享扩展的用户提供严格的类型检查和自动完成。
+
+###### 使用通用方法 ​
+
+包含 `$allModels` 下方法的扩展适用于每个模型，而不是特定模型。类似地， `$allOperations` 下的方法适用于整个客户端实例，而不适用于命名组件，例如结果或查询。
+您不需要对客户端组件使用 `$all` 前缀，因为客户端组件始终应用于客户端实例。
+例如，通用扩展可能采用以下形式：
+
+```ts
+export default Prisma.defineExtension({
+  name: "prisma-extension-find-or-create", //Extension name
+  model: {
+    $allModels: {
+      // new method
+      findOrCreate(/* args */) {
+        /* code for the new method */
+        return query(args);
+      },
+    },
+  },
+});
+```
+
+请参阅以下页面了解修改 Prisma 客户端操作的不同方法：
+
+- [修改所有 Prisma Client 操作](https://www.prisma.io/docs/orm/prisma-client/client-extensions/query#modify-all-prisma-client-operations)
+- [修改架构的所有模型中的特定操作](https://www.prisma.io/docs/orm/prisma-client/client-extensions/query#modify-a-specific-operation-in-all-models-of-your-schema)
+- [修改架构的所有模型中的所有操作](https://www.prisma.io/docs/orm/prisma-client/client-extensions/query#modify-all-operations-in-all-models-of-your-schema)
+
+###### 将可共享扩展发布到 npm​
+
+然后您可以在 npm 上共享该扩展。当您选择软件包名称时，我们建议您使用 prisma-extension-<package-name> 约定，以便更轻松地查找和安装。
+
+###### 从打包的扩展中调用客户端级方法 ​
+
+**WARNING:**
+_目前，引用 PrismaClient 并调用客户端级方法的扩展存在限制，如下例所示。_
+_如果您从[事务](https://www.prisma.io/docs/orm/prisma-client/queries/transactions)（交互式或批处理）内部触发扩展，则扩展代码将在新连接中发出查询并忽略当前事务上下文。_
+_[在 GitHub 上的本期中了解更多信息：需要使用客户端级方法的客户端扩展以静默方式忽略事务。](https://github.com/prisma/prisma/issues/20678)_
+
+在以下情况下，您需要引用您的扩展包装的 Prisma Client 实例：
+
+- 当您想在打包的扩展中使用[客户端级方法](https://www.prisma.io/docs/orm/reference/prisma-client-reference#client-methods)（例如 `$queryRaw`）时。
+- 当您想要在打包的扩展中链接多个 `$extends` 调用时。
+
+但是，当有人在他们的项目中包含您打包的扩展时，您的代码无法知道 Prisma 客户端实例的详细信息。
+您可以按如下方式引用该客户端实例：
+
+```ts
+Prisma.defineExtension((client) => {
+  // The Prisma Client instance that the extension user applies the extension to
+  return client.$extends({
+    name: "prisma-extension-<extension-name>",
+  });
+});
+```
+
+例如：
+
+```ts
+export default Prisma.defineExtension((client) => {
+  return client.$extends({
+    name: "prisma-extension-find-or-create",
+    query: {
+      $allModels: {
+        async findOrCreate({ args, query, operation }) {
+          return (await client.$transaction([query(args)]))[0];
+        },
+      },
+    },
+  });
+});
+```
+
+###### 高级类型安全：用于定义通用扩展的类型实用程序 ​
+
+您可以使用[类型实用程序](https://www.prisma.io/docs/orm/prisma-client/client-extensions/type-utilities)来提高共享扩展的类型安全性。
 
 ### 类型实用程序
 
+Prisma Client 中存在多种类型实用程序，可以帮助创建高度类型安全的扩展。
 
-### 共享包和示例
+#### 类型实用程序 ​
+
+[Prisma 客户端类型实用程序](https://www.prisma.io/docs/orm/prisma-client/type-safety)是您的应用程序和 Prisma 客户端扩展中可用的实用程序，并提供为您的扩展构建安全和可扩展类型的有用方法。
+
+可用的类型实用程序有：
+
+- `Exact<Input, Shape>`：对输入强制执行严格的类型安全。 `Exact` 确保泛型类型 `Input` 严格符合您在 `Shape` 中指定的类型。它将输入范围缩小到最精确的类型。
+- `Args<Type, Operation>`：检索任何给定模型和操作的输入参数。这对于想要执行以下操作的扩展作者特别有用：
+  - 重用现有类型来扩展或修改它们。
+  - 受益于与现有操作相同的自动完成体验。
+- `Result<Type, Arguments, Operation>`：获取输入参数并提供给定模型和操作的结果。您通常会将其与 `Args` 结合使用。与 `Args` 一样，`Result` 可帮助您重用现有类型来扩展或修改它们。
+- `Payload<Type, Operation>`：检索结果的整个结构，作为给定模型和操作的标量和关系对象。例如，您可以使用它来确定哪些键是类型级别的标量或对象。
+  以下示例基于`findFirst` 创建一个新操作`exists`。它具有 `findFirst` 的所有参数。
+
+```ts
+const prisma = new PrismaClient().$extends({
+  model: {
+    $allModels: {
+      // Define a new `exists` operation on all models
+      // T is a generic type that corresponds to the current model
+      async exists<T>(
+        // `this` refers to the current type, e.g. `prisma.user` at runtime
+        this: T,
+
+        // The `exists` function will use the `where` arguments from the current model, `T`, and the `findFirst` operation
+        where: Prisma.Args<T, "findFirst">["where"]
+      ): Promise<boolean> {
+        // Retrieve the current model at runtime
+        const context = Prisma.getExtensionContext(this);
+
+        // Prisma Client query that retrieves data based
+        const result = await (context as any).findFirst({ where });
+        return result !== null;
+      },
+    },
+  },
+});
+
+async function main() {
+  const user = await prisma.user.exists({ name: "Alice" });
+  const post = await prisma.post.exists({
+    OR: [
+      { title: { contains: "Prisma" } },
+      { content: { contains: "Prisma" } },
+    ],
+  });
+}
+```
+
+#### 向方法添加自定义属性 ​
+
+以下示例说明了如何将自定义参数添加到扩展中的方法：
+
+```ts
+type CacheStrategy = {
+  swr: number;
+  ttl: number;
+};
+
+const prisma = new PrismaClient().$extends({
+  model: {
+    $allModels: {
+      findMany<T, A>(
+        this: T,
+        args: Prisma.Exact<
+          A,
+          // For the `findMany` method, use the arguments from model `T` and the `findMany` method
+          // and intersect it with `CacheStrategy` as part of `findMany` arguments
+          Prisma.Args<T, "findMany"> & CacheStrategy
+        >
+      ): Prisma.Result<T, A, "findMany"> {
+        // method implementation with the cache strategy
+      },
+    },
+  },
+});
+
+async function main() {
+  await prisma.post.findMany({
+    cacheStrategy: {
+      ttl: 360,
+      swr: 60,
+    },
+  });
+}
+```
+
+这里的例子只是概念性的。为了使实际的缓存发挥作用，您必须实现逻辑。如果您对缓存扩展/服务感兴趣，我们建议您查看 [Prisma Accelerate](https://www.prisma.io/accelerate)。
+
+### [共享包和示例](https://www.prisma.io/docs/orm/prisma-client/client-extensions/extension-examples)
 
 ### 中间件
+
+**WARNING:**
+_已弃用：中间件在版本 4.16.0 中已弃用。_
+_我们建议使用 Prisma 客户端扩展查询组件类型作为中间件的替代方案。 Prisma 客户端扩展首次在 4.7.0 版本中引入预览版，并在 4.16.0 中全面可用。_
+_Prisma 客户端扩展允许您创建独立的 Prisma 客户端实例并将每个客户端绑定到特定的过滤器或用户。例如，您可以将客户端绑定到特定用户以提供用户隔离。 Prisma 客户端扩展还提供端到端类型安全。_
+中间件充当查询级生命周期挂钩，允许您在查询运行之前或之后执行操作。使用`prisma.$use`方法添加中间件，如下：
+
+```ts
+const prisma = new PrismaClient();
+
+// Middleware 1
+prisma.$use(async (params, next) => {
+  // Manipulate params here
+  const result = await next(params);
+  // See results here
+  return result;
+});
+
+// Middleware 2
+prisma.$use(async (params, next) => {
+  // Manipulate params here
+  const result = await next(params);
+  // See results here
+  return result;
+});
+
+// Queries here
+```
+
+**WARNING:**
+_使用[批量事务](https://www.prisma.io/docs/orm/prisma-client/queries/transactions#sequential-prisma-client-operations)时，不要在中间件内多次调用 `next` 。这将导致您中断交易并导致意想不到的结果。_
+
+`params` 表示中间件中可用的参数，例如查询的名称，`next` 表示堆栈中的[下一个中间件或原始 Prisma 客户端查询](https://www.prisma.io/docs/orm/prisma-client/client-extensions/middleware#running-order-and-the-middleware-stack)。
+
+中间件的可能用例包括：
+
+- 设置或覆盖字段值 - 例如，[设置博客文章评论的上下文语言](https://www.prisma.io/docs/orm/prisma-client/client-extensions/middleware/session-data-middleware)
+- 验证输入数据 - 例如，通过外部服务检查用户输入是否存在不适当的语言
+- 拦截删除查询并将其更改为更新以执行[软删除](https://www.prisma.io/docs/orm/prisma-client/client-extensions/middleware/soft-delete-middleware)
+- [记录执行查询所花费的时间](https://www.prisma.io/docs/orm/prisma-client/client-extensions/middleware/logging-middleware)
+  中间件还有很多用例 - 此列表可以为中间件旨在解决的问题类型提供灵感。
+
+#### 样品 ​
+
+以下示例场景展示了如何在实践中使用中间件:
+
+- [中间件示例：软删除](https://www.prisma.io/docs/orm/prisma-client/client-extensions/middleware/soft-delete-middleware)
+- [中间件示例：日志记录](https://www.prisma.io/docs/orm/prisma-client/client-extensions/middleware/logging-middleware)
+- [中间件示例：会话数据](https://www.prisma.io/docs/orm/prisma-client/client-extensions/middleware/session-data-middleware)
+
+#### 在哪里添加中间件 ​
+
+在请求处理程序的上下文之外添加 Prisma Client 中间件，否则每个请求都会将中间件的新实例添加到堆栈中。以下示例演示了在 Express 应用程序上下文中添加 Prisma Client 中间件的位置：
+
+```ts
+import express from "express";
+import { PrismaClient } from "@prisma/client";
+
+const prisma = new PrismaClient();
+
+prisma.$use(async (params, next) => {
+  // Manipulate params here
+  const result = await next(params);
+  // See results here
+  return result;
+});
+
+const app = express();
+app.get("/feed", async (req, res) => {
+  // NO MIDDLEWARE HERE
+  const posts = await prisma.post.findMany({
+    where: { published: true },
+    include: { author: true },
+  });
+  res.json(posts);
+});
+```
+
+#### 运行顺序和中间件堆栈 ​
+
+如果您有多个中间件，则每个单独查询的运行顺序为：
+
+1. 每个中间件中`await next(params)`之前的所有逻辑，按降序排列
+2. 每个中间件中`await next(params)`之后的所有逻辑，按升序排列
+
+根据您在堆栈中的位置，`await next(params)` 之一：
+
+- 运行下一个中间件（在示例中的中间件 #1 和 #2 中）或
+- 运行原始 Prisma 客户端查询（在中间件 #3 中）
+
+```ts
+const prisma = new PrismaClient();
+
+// Middleware 1
+prisma.$use(async (params, next) => {
+  console.log(params.args.data.title);
+  console.log("1");
+  const result = await next(params);
+  console.log("6");
+  return result;
+});
+
+// Middleware 2
+prisma.$use(async (params, next) => {
+  console.log("2");
+  const result = await next(params);
+  console.log("5");
+  return result;
+});
+
+// Middleware 3
+prisma.$use(async (params, next) => {
+  console.log("3");
+  const result = await next(params);
+  console.log("4");
+  return result;
+});
+
+const create = await prisma.post.create({
+  data: {
+    title: "Welcome to Prisma Day 2020",
+  },
+});
+
+const create2 = await prisma.post.create({
+  data: {
+    title: "How to Prisma!",
+  },
+});
+
+// Welcome to Prisma Day 2020
+// 1
+// 2
+// 3
+// 4
+// 5
+// 6
+// How to Prisma!
+// 1
+// 2
+// 3
+// 4
+// 5
+// 6
+```
+
+#### 性能和适当的用例
+中间件针对每个查询执行，这意味着过度使用可能会对性能产生负面影响。为了避免增加性能开销：
+- 在中间件中尽早检查 `params.model` 和 `params.action` 属性，以避免不必要的运行逻辑：
+```ts
+prisma.$use(async (params, next) => {
+  if (params.model == 'Post' && params.action == 'delete') {
+    // Logic only runs for delete action and Post model
+  }
+  return next(params)
+})
+```
+``
+考虑中间件是否适合您的场景。例如：
+- 如果需要填充字段，可以使用`@default`属性吗？
+- 如果需要设置 `DateTime` 字段的值，可以使用 `now()` 函数或 `@updatedAt` 属性吗？
+- 如果需要执行更复杂的验证，可以在数据库本身中使用 `CHECK` 约束吗？
 
 
 ## type safety
