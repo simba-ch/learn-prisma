@@ -9814,32 +9814,386 @@ const create2 = await prisma.post.create({
 ```
 
 #### 性能和适当的用例
+
 中间件针对每个查询执行，这意味着过度使用可能会对性能产生负面影响。为了避免增加性能开销：
+
 - 在中间件中尽早检查 `params.model` 和 `params.action` 属性，以避免不必要的运行逻辑：
+
 ```ts
 prisma.$use(async (params, next) => {
-  if (params.model == 'Post' && params.action == 'delete') {
+  if (params.model == "Post" && params.action == "delete") {
     // Logic only runs for delete action and Post model
   }
-  return next(params)
-})
+  return next(params);
+});
 ```
+
 ``
 考虑中间件是否适合您的场景。例如：
+
 - 如果需要填充字段，可以使用`@default`属性吗？
 - 如果需要设置 `DateTime` 字段的值，可以使用 `now()` 函数或 `@updatedAt` 属性吗？
 - 如果需要执行更复杂的验证，可以在数据库本身中使用 `CHECK` 约束吗？
 
-
 ## type safety
 
-## testing
+Prisma Client 生成的代码包含几个有用的类型和实用程序，您可以使用它们使您的应用程序更加类型安全。
+**NOTE:**
+_如果您对 Prisma ORM 的高级类型安全主题感兴趣，请务必查看这篇关于[使用新的 TypeScript satisfies 关键字改进 Prisma Client 工作流程的博客文章](https://www.prisma.io/blog/satisfies-operator-ur8ys8ccq7zb)。_
 
-## deployment
+### 导入生成的类型 ​
 
-## observability & logging
+您可以导入 Prisma 命名空间并使用点表示法来访问类型和实用程序。
+以下示例演示如何导入 Prisma 命名空间并使用它来访问和使用 Prisma.UserSelect 生成的类型：
 
-## debugging & troubleshooting
+```ts
+import { Prisma } from "@prisma/client";
+
+// Build 'select' object
+const userEmail: Prisma.UserSelect = {
+  email: true,
+};
+
+// Use select object
+const createUser = await prisma.user.create({
+  data: {
+    email: "bob@prisma.io",
+  },
+  select: userEmail,
+});
+```
+
+另请参阅：[使用 Prisma.UserCreateInput 生成类型](https://www.prisma.io/docs/orm/prisma-client/queries/crud#create-a-single-record-using-generated-types)
+
+### 什么是生成类型？​
+
+生成的类型是**从模型派生的 TypeScript 类型**。您可以使用它们创建类型化对象，并将其传递到顶级方法（如 `prisma.user.create(...)` 或 `prisma.user.update(...)`）或选项（如 `select` 或 `include`）中。
+
+例如，`select` 接受 `UserSelect` 类型的对象。它的对象属性与根据模型的 `select` 语句支持的对象属性相匹配。
+
+有关可用的不同类型的更多信息，请参阅[模型查询选项参考](https://www.prisma.io/docs/orm/reference/prisma-client-reference#model-query-options)。
+
+#### 生成的 UncheckedInput 类型 ​
+
+`UncheckedInput` 类型是一组特殊的生成类型，允许您执行 Prisma 客户端认为“不安全”的一些操作，例如直接写入[关系标量字段](https://www.prisma.io/docs/orm/prisma-schema/data-model/relations)。在执行`create`、`update`或`upsert`等操作时，您可以选择“安全”输入类型或“不安全”`UncheckedInput` 类型。
+
+#### Type utilities
+
+为了帮助您创建高度类型安全的应用程序，Prisma Client 提供了一组可利用输入和输出类型的类型实用程序。这些类型是完全动态的，这意味着它们适应任何给定的模型和模式。您可以使用它们来改善项目的自动完成和开发人员体验。
+
+这在[验证输入](https://www.prisma.io/docs/orm/prisma-client/type-safety/prisma-validator)和[共享 Prisma 客户端扩展](https://www.prisma.io/docs/orm/prisma-client/client-extensions/shared-extensions)时特别有用。
+
+Prisma 客户端中提供以下类型实用程序：
+
+- `Exact<Input, Shape>`: 对输入强制执行严格的类型安全。 `Exact` 确保泛型类型 `Input` 严格符合您在 `Shape` 中指定的类型。它将输入范围缩小到最精确的类型。
+- `Args<Type, Operation>`: 检索任何给定模型和操作的输入参数。这对于想要执行以下操作的扩展作者特别有用：
+  - 重用现有类型来扩展或修改它们。
+  - 受益于与现有操作相同的自动完成体验。
+- `Result<Type, Arguments, Operation>`：获取输入参数并提供给定模型和操作的结果。您通常会将其与 Args 结合使用。与 Args 一样，Result 可帮助您重用现有类型来扩展或修改它们。
+- `Payload<Type, Operation>`：检索结果的整个结构，作为给定模型和操作的标量和关系对象。例如，您可以使用它来确定哪些键是类型级别的标量或对象。
+
+举个例子，这里有一个快速方法，可以强制函数的参数与传递给 post.create 的参数相匹配：
+
+```ts
+type PostCreateBody = Prisma.Args<typeof prisma.post, "create">["data"];
+
+const addPost = async (postBody: PostCreateBody) => {
+  const post = await prisma.post.create({ data: postBody });
+  return post;
+};
+
+await addPost(myData);
+//              ^ guaranteed to match the input of `post.create`
+```
+
+### Prisma validator
+
+[Prisma.validator](https://www.prisma.io/docs/orm/reference/prisma-client-reference#prismavalidator) 是一个实用程序函数，它接受生成的类型并返回遵循生成的类型模型字段的类型安全对象。
+
+#### 创建类型化查询语句 ​
+
+让我们假设您创建了一个新的 userEmail 对象，您希望在整个应用程序的不同查询中重复使用该对象。它是键入的并且可以在查询中安全地使用。
+下面的示例要求 Prisma 返回 id 为 3 的用户的电子邮件，如果不存在则返回 null。
+
+```ts
+import { Prisma } from "@prisma/client";
+
+const userEmail: Prisma.UserSelect = {
+  email: true,
+};
+
+// Run inside async function
+const user = await prisma.user.findUnique({
+  where: {
+    id: 3,
+  },
+  select: userEmail,
+});
+```
+
+这很有效，但以这种方式提取查询语句有一个警告。
+您会注意到，如果将鼠标悬停在 userEmail 上，TypeScript 将不会推断对象的键或值（即 email: true）。
+如果您在 `prisma.user.findUnique(...)` 查询中对 userEmail 使用点表示法，则同样适用，您将能够访问所选对象可用的所有属性。
+如果您在一个文件中使用它可能没问题，但如果您要导出该对象并在其他查询中使用它，或者如果您正在编译一个外部库，您希望在其中控制用户如何在其内部使用该对象查询，那么这将不是类型安全的。
+创建对象 userEmail 是为了仅选择用户的电子邮件，但它仍然允许访问所有其他可用属性。它是类型化的，但不是类型安全的。
+Prisma 有一种方法来验证生成的类型以确保它们是类型安全的，这是命名空间上可用的实用程序函数，称为验证器。
+
+#### 使用 `Prisma.validator​`
+
+以下示例将 UserSelect 生成的类型传递到 Prisma.validator 实用程序函数中，并以与前面的示例大致相同的方式定义预期返回类型。
+
+```ts
+import { Prisma } from "@prisma/client";
+
+const userEmail = Prisma.validator<Prisma.UserSelect>()({
+  email: true,
+});
+
+// Run inside async function
+const user = await prisma.user.findUnique({
+  where: {
+    id: 3,
+  },
+  select: userEmail,
+});
+```
+
+或者，您可以使用以下语法，该语法使用 Prisma Client 的现有实例使用“选择器”模式：
+
+```ts
+import { Prisma } from "@prisma/client";
+import prisma from "./lib/prisma";
+
+const userEmail = Prisma.validator(
+  prisma,
+  "user",
+  "findUnique",
+  "select"
+)({
+  email: true,
+});
+```
+
+最大的区别是 userEmail 对象现在是类型安全的。如果将鼠标悬停在其上，TypeScript 会告诉您该对象的键/值对。如果您使用点表示法访问对象的属性，您将只能访问对象的电子邮件属性。
+当与用户定义的输入（例如表单数据）结合使用时，此功能非常方便。
+
+#### 将 Prisma.validator 与表单输入相结合 ​
+
+以下示例从 Prisma.validator 创建一个类型安全函数，可在与用户创建的数据（例如表单输入）交互时使用。
+**NOTE:**
+_表单输入是在运行时确定的，因此无法仅使用 TypeScript 进行验证。在将数据传递到数据库之前，请务必通过其他方式（例如外部验证库）验证表单输入。_
+
+```ts
+import { Prisma, PrismaClient } from "@prisma/client";
+
+const prisma = new PrismaClient();
+
+// Create a new function and pass the parameters onto the validator
+const createUserAndPost = (
+  name: string,
+  email: string,
+  postTitle: string,
+  profileBio: string
+) => {
+  return Prisma.validator<Prisma.UserCreateInput>()({
+    name,
+    email,
+    posts: {
+      create: {
+        title: postTitle,
+      },
+    },
+    profile: {
+      create: {
+        bio: profileBio,
+      },
+    },
+  });
+};
+
+const findSpecificUser = (email: string) => {
+  return Prisma.validator<Prisma.UserWhereInput>()({
+    email,
+  });
+};
+
+// Create the user in the database based on form input
+// Run inside async function
+await prisma.user.create({
+  data: createUserAndPost(
+    "Rich",
+    "rich@boop.com",
+    "Life of Pie",
+    "Learning each day"
+  ),
+});
+
+// Find the specific user based on form input
+// Run inside async function
+const oneUser = await prisma.user.findUnique({
+  where: findSpecificUser("rich@boop.com"),
+});
+```
+
+`createUserAndPost` 自定义函数是使用 `Prisma.validator` 创建的，并传递生成的类型 `UserCreateInput`。 `Prisma.validator` 验证函数输入，因为分配给参数的类型必须与生成的类型期望的类型匹配。
+
+### Operating against partial structures of your mode types
+
+使用 Prisma 客户端时，Prisma 架构中的每个模型都会转换为专用的 TypeScript 类型。
+
+- 问题：使用生成的模型类型的变体 ​
+  **描述：**在某些情况下，您可能需要生成的用户类型的变体。例如，当您有一个函数需要一个带有 posts 关系的 User 模型实例时。或者，当您需要一种类型来仅在应用程序代码中传递用户模型的电子邮件和姓名字段时。
+  **解决方案：**
+  作为解决方案，您可以使用 Prisma 客户端的帮助程序类型自定义生成的模型类型。
+  User 类型仅包含模型的标量字段，但不考虑任何关系。这是因为 Prisma 客户端查询中默认不包含关系。
+  但是，有时拥有包含关系的可用类型（即从使用 include 的 API 调用中获取的类型）很有用。同样，另一个有用的场景可能是拥有一个仅包含模型标量字段的子集的可用类型（即从使用 select 的 API 调用中获取的类型）。
+  实现此目的的一种方法是在应用程序代码中手动定义这些类型：
+
+```ts
+// 1: Define a type that includes the relation to `Post`
+type UserWithPosts = {
+  id: string;
+  email: string;
+  name: string | null;
+  posts: Post[];
+};
+
+// 2: Define a type that only contains a subset of the scalar fields
+type UserPersonalData = {
+  email: string;
+  name: string | null;
+};
+```
+
+虽然这当然是可行的，但这种方法增加了 Prisma 架构更改时的维护负担，因为您需要手动维护类型。
+对此的一个更简洁的解决方案是结合验证器使用 Prisma 命名空间下 Prisma 客户端生成和公开的 UserGetPayload 类型。
+以下示例使用 Prisma.validator 创建两个类型安全对象，然后使用 Prisma.UserGetPayload 实用函数创建可用于返回所有用户及其帖子的类型。
+
+```ts
+import { Prisma } from "@prisma/client";
+
+// 1: Define a type that includes the relation to `Post`
+const userWithPosts = Prisma.validator<Prisma.UserDefaultArgs>()({
+  include: { posts: true },
+});
+
+// 2: Define a type that only contains a subset of the scalar fields
+const userPersonalData = Prisma.validator<Prisma.UserDefaultArgs>()({
+  select: { email: true, name: true },
+});
+
+// 3: This type will include a user and all their posts
+type UserWithPosts = Prisma.UserGetPayload<typeof userWithPosts>;
+```
+
+后一种方法的主要好处是：
+
+- 更简洁的方法，因为它利用 Prisma 客户端生成的类型
+- 模式更改时减少维护负担并提高类型安全性
+
+- 问题：获取函数的返回类型 ​
+  **描述 ​:**
+  当对模型进行`select`或`include`操作并从函数返回这些变体时，可能很难访问返回类型，例如：
+
+```ts
+// Function definition that returns a partial structure
+async function getUsersWithPosts() {
+  const users = await prisma.user.findMany({ include: { posts: true } });
+  return users;
+}
+```
+
+从上面的代码片段中提取表示“有帖子的用户”的类型需要一些高级的 TypeScript 用法：
+
+```ts
+// Function definition that returns a partial structure
+async function getUsersWithPosts() {
+  const users = await prisma.user.findMany({ include: { posts: true } });
+  return users;
+}
+
+// Extract `UsersWithPosts` type with
+type ThenArg<T> = T extends PromiseLike<infer U> ? U : T;
+type UsersWithPosts = ThenArg<ReturnType<typeof getUsersWithPosts>>;
+
+// run inside `async` function
+const usersWithPosts: UsersWithPosts = await getUsersWithPosts();
+```
+
+**解决方案 ​:**
+使用 Prisma 命名空间公开的 PromiseReturnType，您可以更优雅地解决这个问题：
+
+```ts
+import { Prisma } from "@prisma/client";
+
+type UsersWithPosts = Prisma.PromiseReturnType<typeof getUsersWithPosts>;
+```
+
+### How to use Prisma ORM's type system
+
+#### Prisma ORM 的类型系统如何工作？​
+
+Prisma ORM 使用类型来定义字段可以保存的数据类型。为了方便入门，Prisma ORM 提供了少量核心标量类型，应涵盖大多数默认用例。例如，采用以下博客文章模型：
+
+```prisma
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Post {
+  id        Int      @id
+  title     String
+  createdAt DateTime
+}
+```
+
+Post 模型的 title 字段使用 `String` 标量类型，而 createdAt 字段使用 `DateTime` 标量类型。
+数据库也有自己的类型系统，它定义列可以保存的值的类型。大多数数据库提供大量数据类型，以便对列可以存储的内容进行细粒度控制。例如，数据库可能提供对多种大小的整数或 XML 数据的内置支持。这些类型的名称因数据库而异。例如，在 PostgreSQL 中，布尔值的列类型是 `boolean`，而在 MySQL 中，通常使用 `tinyint(1)` 类型。
+
+##### 默认类型映射 ​
+
+为了让您开始使用我们的核心标量类型，Prisma ORM 提供了默认类型映射，将每个标量类型映射到底层数据库中的默认类型。例如：
+
+- 默认情况下，Prisma ORM 的 `String` 类型映射到 PostgreSQL 的 `text` 类型和 MySQL 的 `varchar` 类型
+- 默认情况下，Prisma ORM 的 `DateTime` 类型映射到 PostgreSQL 的 `timestamp(3)` 类型和 SQL Server 的 `datetime2` 类型
+  请参阅 Prisma ORM 的[数据库连接器页面](https://www.prisma.io/docs/orm/overview/databases)，了解给定数据库的默认类型映射。
+  要查看特定给定 Prisma ORM 类型的所有数据库的默认类型映射，请参阅 Prisma 架构参考的[模型字段标量类型部分](https://www.prisma.io/docs/orm/reference/prisma-schema-reference#model-field-scalar-types)。
+
+##### 原生类型映射 ​
+
+有时您可能需要使用更具体的数据库类型，该类型不是 Prisma ORM 类型的默认类型映射之一。为此，Prisma ORM 提供了本机类型属性来细化核心标量类型。例如，在上面的 Post 模型的 createdAt 字段中，您可能希望通过使用日期类型而不是默认类型时间戳 (3) 映射，在基础 PostgreSQL 数据库中使用仅日期列。为此，请将 @db.Date 本机类型属性添加到 createdAt 字段：
+
+```prisma
+model Post {
+  id        Int      @id
+  title     String
+  createdAt DateTime @db.Date
+}
+```
+
+本机类型映射允许您表达数据库中的所有类型。但是，如果 Prisma ORM 默认值满足您的需求，则不需要使用它们。这将为常见用例提供更短、更易读的 Prisma 架构。
+
+#### 如何内省数据库类型 ​
+当您内省现有数据库时，Prisma ORM 将获取每个表列的数据库类型，并使用相应模型字段的正确 Prisma ORM 类型在 Prisma 架构中表示它。如果数据库类型不是该 Prisma ORM 标量类型的默认数据库类型，Prisma ORM 还将添加本机类型属性。
+
+#### 将架构更改应用于数据库时如何使用类型 ​
+当您使用 `Prisma Migrate` 或 `db Push` 将架构更改应用到数据库时，Prisma ORM 将使用每个字段的 Prisma ORM 标量类型及其必须的任何本机属性来确定数据库中相应列的正确数据库类型。
+
+
+#### 有关使用 Prisma ORM 类型系统的更多信息 ​
+有关使用 Prisma ORM 类型系统的更多参考信息，请参阅以下资源：
+- 每个数据库提供程序的[数据库连接器](https://www.prisma.io/docs/orm/overview)页面都有一个类型映射部分，其中包含 Prisma ORM 类型和数据库类型之间的默认类型映射表，以及数据库类型及其在 Prisma ORM 中相应的本机类型属性的表。
+- Prisma 架构参考的[模型字段标量类型](https://www.prisma.io/docs/orm/reference/prisma-schema-reference#model-field-scalar-types)部分针对每个 Prisma ORM 标量类型都有一个小节。这包括每个数据库中 Prisma ORM 类型的默认映射表，以及每个数据库的表，列出了 Prisma ORM 中相应的数据库类型及其本机类型属性。
+
+
+## Testing
+
+## Deployment
+
+## Observability & logging
+
+## Debugging & troubleshooting
 
 # MIGRATE
 
