@@ -10189,7 +10189,152 @@ model Post {
 
 ## Testing
 
-## Deployment
+### unit testing
+单元测试旨在隔离一小部分（单元）代码并测试其逻辑上可预测的行为。它通常涉及模拟对象或服务器响应来模拟现实世界的行为。单元测试的一些好处包括：
+- 快速查找并隔离代码中的错误。
+- 通过指示某些代码块应该做什么来为每个代码模块提供文档。
+- 一个有用的衡量标准，表明重构进展顺利。代码重构后测试仍应通过。
+在 Prisma ORM 的上下文中，这通常意味着测试使用 Prisma 客户端进行数据库调用的函数。
+单个测试应重点关注函数逻辑如何处理不同的输入（例如空值或空列表）。
+这意味着您应该致力于删除尽可能多的依赖项，例如外部服务和数据库，以保持测试及其环境尽可能轻量级。
+
+**NOTE:**
+*[这篇博文](https://www.prisma.io/blog/testing-series-2-xPhjjmIEsM)提供了使用 Prisma ORM 在 Express 项目中实施单元测试的全面指南。如果您想深入研究这个主题，请务必阅读它！*
+
+
+#### 先决条件
+本指南假设您的项目中已设置了 JavaScript 测试库 [Jest](https://jestjs.io/) 和 [ts-jest](https://github.com/kulshekhar/ts-jest)。
+
+#### Mocking Prisma Client
+为了确保您的单元测试与外部因素隔离，您可以模拟 Prisma Client，这意味着您可以获得能够使用架构（类型安全）的好处，而无需在测试运行时实际调用数据库。
+本指南将介绍两种模拟 Prisma 客户端的方法：单例实例和依赖项注入。两者各有优点，具体取决于您的用例。为了帮助模拟 Prisma 客户端，将使用 `jest-mock-extended` 包。
+
+##### 单例​
+1. 在项目根目录创建一个名为 client.ts 的文件并添加以下代码。这将实例化一个 Prisma 客户端实例。
+```ts
+import { PrismaClient } from '@prisma/client'
+
+const prisma = new PrismaClient()
+export default prisma
+```
+
+2. 接下来在项目根目录创建一个名为 singleton.ts 的文件并添加以下内容：
+```ts
+import { PrismaClient } from '@prisma/client'
+import { mockDeep, mockReset, DeepMockProxy } from 'jest-mock-extended'
+
+import prisma from './client'
+
+jest.mock('./client', () => ({
+  __esModule: true,
+  default: mockDeep<PrismaClient>(),
+}))
+
+beforeEach(() => {
+  mockReset(prismaMock)
+})
+
+export const prismaMock = prisma as unknown as DeepMockProxy<PrismaClient>
+```
+单例文件告诉 Jest 模拟默认导出（./client.ts 中的 Prisma Client 实例），并使用 jest-mock-extended 中的 mockDeep 方法来访问 Prisma Client 上可用的对象和方法。然后，它会在每次测试运行之前重置模拟实例。
+接下来，将 setupFilesAfterEnv 属性添加到 jest.config.js 文件中，其中包含 singleton.ts 文件的路径。
+```js
+module.exports = {
+  clearMocks: true,
+  preset: 'ts-jest',
+  testEnvironment: 'node',
+  setupFilesAfterEnv: ['<rootDir>/singleton.ts'],
+}
+```
+
+##### 依赖注入​
+1. 创建 context.ts 文件并添加以下内容：
+```ts
+import { PrismaClient } from '@prisma/client'
+import { mockDeep, DeepMockProxy } from 'jest-mock-extended'
+
+export type Context = {
+  prisma: PrismaClient
+}
+
+export type MockContext = {
+  prisma: DeepMockProxy<PrismaClient>
+}
+
+export const createMockContext = (): MockContext => {
+  return {
+    prisma: mockDeep<PrismaClient>(),
+  }
+}
+```
+**TIP:**
+*如果您发现通过模拟 Prisma 客户端突出显示循环依赖错误，请尝试将 `"strictNullChecks": true` 添加到 tsconfig.json 中。*
+
+2. 要使用上下文，您需要在测试文件中执行以下操作：
+```ts
+import { MockContext, Context, createMockContext } from '../context'
+
+let mockCtx: MockContext
+let ctx: Context
+
+beforeEach(() => {
+  mockCtx = createMockContext()
+  ctx = mockCtx as unknown as Context
+})
+```
+这将在通过 createMockContext 函数运行每个测试之前创建一个新的上下文。此 (mockCtx) 上下文将用于对 Prisma 客户端进行模拟调用并运行查询进行测试。 ctx 上下文将用于运行测试的场景查询。
+
+#### [单元测试示例​](https://www.prisma.io/docs/orm/prisma-client/testing/unit-testing#example-unit-tests)
+
+
+### integration testing
+集成测试侧重于测试程序的各个部分如何协同工作。在使用数据库的应用程序上下文中，集成测试通常要求数据库可用并且包含便于测试场景的数据。
+
+模拟真实环境的一种方法是使用 Docker 封装数据库和一些测试数据。它可以通过测试进行启动和拆除，从而作为远离生产数据库的隔离环境运行。
+**NOTE:**
+*[这篇博文](https://www.prisma.io/blog/testing-series-2-xPhjjmIEsM)提供了有关设置集成测试环境和针对真实数据库编写集成测试的全面指南，为那些希望探索该主题的人提供了宝贵的见解。*
+
+#### 先决条件
+本指南假设您的计算机上安装了 Docker 和 Docker Compose，并且项目中安装了 Jest。
+
+#### [将 Docker 添加到您的项目中​](https://www.prisma.io/docs/orm/prisma-client/testing/integration-testing#add-docker-to-your-project)
+
+#### 集成测试​
+集成测试将在专用测试环境而不是生产或开发环境中针对数据库运行。
+
+##### 操作流程​
+1. 启动容器并创建数据库
+2. 迁移架构
+3. 运行测试
+4. 销毁容器
+每个测试套件都会在所有测试运行之前为数据库播种。套件中的所有测试完成后，所有表中的数据将被删除并终止连接。
+
+##### [要测试的功能]​(https://www.prisma.io/docs/orm/prisma-client/testing/integration-testing#the-function-to-test)
+
+##### [测试套件​](https://www.prisma.io/docs/orm/prisma-client/testing/integration-testing#the-test-suite)
+
+#### 运行测试​
+此设置隔离了现实世界的场景，以便您可以在受控环境中针对真实数据测试应用程序功能。
+
+您可以将一些脚本添加到项目的 package.json 文件中，该文件将设置数据库并运行测试，然后手动销毁容器。
+
+**WARNING:**
+*如果测试不适合您，您需要确保测试数据库已正确设置并准备就绪，如[本博客](https://www.prisma.io/blog/testing-series-3-aBUyF8nxAn#make-the-script-wait-until-the-database-server-is-ready)中所述。*
+```json
+  "scripts": {
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down",
+    "test": "yarn docker:up && yarn prisma migrate deploy && jest -i"
+  },
+```
+
+测试脚本执行以下操作：
+1. 运行 `docker compose up -d `以创建包含 Postgres 映像和数据库的容器。
+2. 将 `./prisma/migrations/` 目录中找到的迁移应用到数据库，这会在容器的数据库中创建表。
+3. 执行测试。
+一旦您满意，您可以运行 `yarn docker:down` 来销毁容器、其数据库和任何测试数据。
+
+## [Deployment](https://www.prisma.io/docs/orm/prisma-client/deployment)
 
 ## Observability & logging
 
